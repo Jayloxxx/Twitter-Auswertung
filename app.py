@@ -1097,6 +1097,32 @@ def delete_session(session_id):
         return jsonify({'error': f'Fehler beim Löschen: {str(e)}'}), 500
 
 
+@app.route('/api/handles', methods=['GET'])
+def get_available_handles():
+    """Alle verfügbaren Twitter-Handles für aktive Session abrufen"""
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'handles': []})
+
+    # Alle Posts der aktiven Session holen (nicht archivierte)
+    posts = TwitterPost.query.filter_by(session_id=active_session.id, is_archived=False).all()
+
+    # Unique Handles extrahieren
+    handles = set()
+    for post in posts:
+        if post.twitter_handle:
+            handles.add(post.twitter_handle)
+
+    # Sortieren und zurückgeben
+    sorted_handles = sorted(list(handles))
+
+    return jsonify({
+        'handles': sorted_handles,
+        'total': len(sorted_handles)
+    })
+
+
 # ==================== INITIALISIERUNG ====================
 
 if __name__ == '__main__':
@@ -1109,8 +1135,8 @@ if __name__ == '__main__':
     print("TWITTER TER DASHBOARD")
     print("="*80)
     print("\n[START] Server startet...")
-    print("[DASHBOARD] http://localhost:5001")
-    print("[API] http://localhost:5001/api/")
+    print("[DASHBOARD] http://localhost:5003")
+    print("[API] http://localhost:5003/api/")
     print("\n")
 
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5003)

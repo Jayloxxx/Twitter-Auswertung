@@ -927,6 +927,66 @@
                             </select>
                         </div>
 
+                        <!-- Handle Filter Dropdown -->
+                        <div class="flex-1 min-w-[250px] relative" x-data="{ open: false }" @click.away="open = false">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Filter nach Ersteller (@)
+                                <span class="text-xs text-gray-500">(<span x-text="selectedHandles.length"></span>/<span x-text="availableHandles.length"></span> ausgewählt)</span>
+                            </label>
+                            <div>
+                                <button @click="open = !open" type="button"
+                                        class="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 flex items-center justify-between">
+                                    <span class="text-sm text-gray-700">
+                                        <span x-show="selectedHandles.length === 0">Keine ausgewählt</span>
+                                        <span x-show="selectedHandles.length > 0 && selectedHandles.length === availableHandles.length">Alle ausgewählt</span>
+                                        <span x-show="selectedHandles.length > 0 && selectedHandles.length < availableHandles.length" x-text="selectedHandles.length + ' ausgewählt'"></span>
+                                    </span>
+                                    <svg class="w-5 h-5 text-gray-400" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+
+                                <!-- Dropdown Menu -->
+                                <div x-show="open"
+                                     x-transition:enter="transition ease-out duration-100"
+                                     x-transition:enter-start="opacity-0 scale-95"
+                                     x-transition:enter-end="opacity-100 scale-100"
+                                     x-transition:leave="transition ease-in duration-75"
+                                     x-transition:leave-start="opacity-100 scale-100"
+                                     x-transition:leave-end="opacity-0 scale-95"
+                                     class="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+
+                                    <!-- Select All / Deselect All -->
+                                    <div class="sticky top-0 bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
+                                        <button @click="selectAllHandles()" type="button"
+                                                class="flex-1 bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors">
+                                            ✓ Alle auswählen
+                                        </button>
+                                        <button @click="deselectAllHandles()" type="button"
+                                                class="flex-1 bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors">
+                                            ✗ Alle abwählen
+                                        </button>
+                                    </div>
+
+                                    <!-- Handle List -->
+                                    <template x-for="handle in availableHandles" :key="handle">
+                                        <div @click="toggleHandle(handle)"
+                                             class="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between">
+                                            <span class="text-sm text-gray-700" x-text="'@' + handle"></span>
+                                            <svg x-show="selectedHandles.includes(handle)" class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                            </svg>
+                                        </div>
+                                    </template>
+
+                                    <!-- Empty State -->
+                                    <div x-show="availableHandles.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">
+                                        Keine Twitter-Handles verfügbar
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="flex items-end">
                             <button @click="loadPosts()" class="bg-primary text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors">
                                 🔄 Aktualisieren
@@ -2600,6 +2660,11 @@
                 // Reviewed Posts
                 reviewedSort: 'ter_manual_desc',
 
+                // Handle Filter (Review Mode)
+                availableHandles: [],
+                selectedHandles: [],
+                showHandleDropdown: false,
+
                 // Pagination
                 pagination: {
                     currentPage: 1,
@@ -2622,7 +2687,19 @@
 
                 // Computed Properties
                 get reviewedPosts() {
-                    return this.posts.filter(p => p.is_reviewed);
+                    return this.posts.filter(p => {
+                        // Filter by reviewed status
+                        if (!p.is_reviewed) return false;
+
+                        // Filter by selected handles
+                        if (this.selectedHandles.length === 0) {
+                            // If no handles selected, show none
+                            return false;
+                        }
+
+                        // Check if post's handle is in selected handles
+                        return this.selectedHandles.includes(p.twitter_handle);
+                    });
                 },
 
                 get paginatedPosts() {
@@ -2644,6 +2721,7 @@
                     await this.loadAllPosts();
                     await this.loadStatistics();
                     await this.loadTimelineData();
+                    await this.loadAvailableHandles();
                 },
 
                 // Keyboard Navigation for Engagement Metrics (4 directions)
@@ -2842,6 +2920,37 @@
                     }
                 },
 
+                async loadAvailableHandles() {
+                    try {
+                        const response = await fetch('/api/handles');
+                        const data = await response.json();
+                        this.availableHandles = data.handles || [];
+                        // Initialize selectedHandles with all handles (show all by default)
+                        this.selectedHandles = [...this.availableHandles];
+                    } catch (error) {
+                        console.error('Error loading available handles:', error);
+                    }
+                },
+
+                toggleHandle(handle) {
+                    const index = this.selectedHandles.indexOf(handle);
+                    if (index === -1) {
+                        // Add handle to filter
+                        this.selectedHandles.push(handle);
+                    } else {
+                        // Remove handle from filter
+                        this.selectedHandles.splice(index, 1);
+                    }
+                },
+
+                selectAllHandles() {
+                    this.selectedHandles = [...this.availableHandles];
+                },
+
+                deselectAllHandles() {
+                    this.selectedHandles = [];
+                },
+
                 renderTimelineCharts() {
                     const currentData = this.timelineView === 'monthly' ? this.timelineData.monthly : this.timelineData.yearly;
 
@@ -3029,6 +3138,7 @@
                             await this.loadPosts();
                             await this.loadAllPosts();
                             await this.loadStatistics();
+                            await this.loadAvailableHandles();
 
                             // Switch to review tab
                             setTimeout(() => {

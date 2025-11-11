@@ -11,7 +11,10 @@
       "Bash(powershell -Command \"(Get-Content ''c:\\Users\\Jason\\Desktop\\Masterarbeit\\Twitter-Auswertung\\templates\\index.html'').Count\")",
       "Bash(powershell -Command \"(Get-Content ''templates\\index.html'') | Select-String -Pattern ''x-show=\"\"currentTab ==='' -Context 0,3 | Select-Object -Last 2\")",
       "Bash(powershell -Command:*)",
-      "Bash(migrate_db.py:*)"
+      "Bash(migrate_db.py:*)",
+      "Bash(sqlite3:*)",
+      "Bash(Out-String)",
+      "Bash(timeout 5 bash -c 'until curl -s http://localhost:5003 > /dev/null; do sleep 0.5; done; echo \"\"Server is ready\"\"')"
     ],
     "deny": [],
     "ask": []
