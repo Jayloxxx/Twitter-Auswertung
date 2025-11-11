@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python app.py:*)",
+      "Bash(python migrate_db.py:*)",
+      "Bash(dir:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(powershell -Command \"(Get-Content ''c:\\Users\\Jason\\Desktop\\Masterarbeit\\Twitter-Auswertung\\app.py'').Count\")",
+      "Bash(powershell -Command \"(Get-Content ''c:\\Users\\Jason\\Desktop\\Masterarbeit\\Twitter-Auswertung\\templates\\index.html'').Count\")",
+      "Bash(powershell -Command \"(Get-Content ''templates\\index.html'') | Select-String -Pattern ''x-show=\"\"currentTab ==='' -Context 0,3 | Select-Object -Last 2\")",
+      "Bash(powershell -Command:*)",
+      "Bash(migrate_db.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
