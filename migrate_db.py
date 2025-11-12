@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Sicheres Datenbank-Migrations-Script fuer Session-Management
+Sicheres Datenbank-Migrations-Script fuer Session-Management und Favoriten
 
 Dieses Skript:
 1. Erstellt die neue analysis_sessions Tabelle
 2. Fuegt session_id zur twitter_posts Tabelle hinzu
-3. Erstellt eine Standard-Session und weist alle bestehenden Posts dieser zu
-4. BEHAELT alle existierenden Daten!
+3. Fuegt is_favorite zur twitter_posts Tabelle hinzu
+4. Erstellt eine Standard-Session und weist alle bestehenden Posts dieser zu
+5. BEHAELT alle existierenden Daten!
 """
 
 from app import app, db, AnalysisSession, TwitterPost
@@ -30,8 +31,39 @@ def migrate():
             session_count = AnalysisSession.query.count()
             print(f"      {session_count} Session(s) gefunden.")
 
-            # Pruefen ob session_id Spalte existiert
+            # Pruefen ob session_id und is_favorite Spalte existiert
             columns = [col['name'] for col in inspector.get_columns('twitter_posts')]
+
+            # is_favorite Spalte hinzufügen falls nicht vorhanden
+            if 'is_favorite' not in columns:
+                print("\nINFO: is_favorite Spalte fehlt - wird hinzugefuegt...")
+                conn = sqlite3.connect('instance/twitter_ter.db')
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("ALTER TABLE twitter_posts ADD COLUMN is_favorite INTEGER DEFAULT 0")
+                    conn.commit()
+                    print("      OK: is_favorite Spalte hinzugefuegt.")
+                except Exception as e:
+                    print(f"      FEHLER: {str(e)}")
+                    conn.rollback()
+                finally:
+                    conn.close()
+
+            # access_date Spalte hinzufügen falls nicht vorhanden
+            if 'access_date' not in columns:
+                print("\nINFO: access_date Spalte fehlt - wird hinzugefuegt...")
+                conn = sqlite3.connect('instance/twitter_ter.db')
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("ALTER TABLE twitter_posts ADD COLUMN access_date TEXT")
+                    conn.commit()
+                    print("      OK: access_date Spalte hinzugefuegt.")
+                except Exception as e:
+                    print(f"      FEHLER: {str(e)}")
+                    conn.rollback()
+                finally:
+                    conn.close()
+
             if 'session_id' not in columns:
                 print("\nWARNING: session_id Spalte fehlt in twitter_posts - wird jetzt hinzugefuegt.")
 
