@@ -3,7 +3,7 @@ Twitter TER Dashboard - Backend
 Professionelles Dashboard für Twitter Engagement Rate Analyse
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
@@ -12,6 +12,18 @@ import io
 import os
 from sqlalchemy import func
 import statistics
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm, cm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+from reportlab.platypus.flowables import HRFlowable
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import math
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 app = Flask(__name__)
 CORS(app)
@@ -52,7 +64,8 @@ class AnalysisSession(db.Model):
             'is_active': self.is_active,
             'post_count': len(self.posts),
             'reviewed_count': len([p for p in self.posts if p.is_reviewed]),
-            'archived_count': len([p for p in self.posts if p.is_archived])
+            'archived_count': len([p for p in self.posts if p.is_archived]),
+            'favorite_count': len([p for p in self.posts if p.is_favorite])
         }
 
 
@@ -121,7 +134,9 @@ class TwitterPost(db.Model):
     # Metadaten
     is_reviewed = db.Column(db.Boolean, default=False)
     is_archived = db.Column(db.Boolean, default=False)
+    is_favorite = db.Column(db.Boolean, default=False)  # Session-übergreifende Favoriten
     notes = db.Column(db.Text)
+    access_date = db.Column(db.String(100))  # Datum des Zugriffs/der Datenerhebung
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -171,7 +186,9 @@ class TwitterPost(db.Model):
             'frame_historisch': self.frame_historisch,
             'is_reviewed': self.is_reviewed,
             'is_archived': self.is_archived,
+            'is_favorite': self.is_favorite,
             'notes': self.notes,
+            'access_date': self.access_date,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -273,6 +290,21 @@ def index():
     return render_template('index.html')
 
 
+def safe_int(value, default=0):
+    """Konvertiert einen Wert sicher zu Integer, auch bei Dezimalzahlen"""
+    if not value or value == '':
+        return default
+    try:
+        # Versuche zuerst direkt zu int
+        return int(value)
+    except ValueError:
+        try:
+            # Falls das fehlschlägt, konvertiere erst zu float, dann zu int
+            return int(float(value))
+        except (ValueError, TypeError):
+            return default
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload_csv():
     """CSV-Datei hochladen und in Datenbank importieren"""
@@ -314,12 +346,12 @@ def upload_csv():
 
             # TER berechnen
             ter_data = TERCalculator.calculate(
-                likes=int(row.get('likes', 0) or 0),
-                bookmarks=int(row.get('bookmarks', 0) or 0),
-                replies=int(row.get('replies', 0) or 0),
-                retweets=int(row.get('retweets', 0) or 0),
-                quotes=int(row.get('quotes', 0) or 0),
-                views=int(row.get('views', 0) or 0)
+                likes=safe_int(row.get('likes', 0)),
+                bookmarks=safe_int(row.get('bookmarks', 0)),
+                replies=safe_int(row.get('replies', 0)),
+                retweets=safe_int(row.get('retweets', 0)),
+                quotes=safe_int(row.get('quotes', 0)),
+                views=safe_int(row.get('views', 0))
             )
 
             # Neuen Post erstellen (alte wurden bereits gelöscht)
@@ -332,15 +364,15 @@ def upload_csv():
                 twitter_url=twitter_url,
                 twitter_author=row.get('twitter_author', ''),
                 twitter_handle=row.get('twitter_handle', ''),
-                twitter_followers=int(row.get('twitter_followers', 0) or 0),
+                twitter_followers=safe_int(row.get('twitter_followers', 0)),
                 twitter_content=row.get('twitter_content', ''),
                 twitter_date=row.get('twitter_date', ''),
-                likes=int(row.get('likes', 0) or 0),
-                retweets=int(row.get('retweets', 0) or 0),
-                replies=int(row.get('replies', 0) or 0),
-                bookmarks=int(row.get('bookmarks', 0) or 0),
-                quotes=int(row.get('quotes', 0) or 0),
-                views=int(row.get('views', 0) or 0),
+                likes=safe_int(row.get('likes', 0)),
+                retweets=safe_int(row.get('retweets', 0)),
+                replies=safe_int(row.get('replies', 0)),
+                bookmarks=safe_int(row.get('bookmarks', 0)),
+                quotes=safe_int(row.get('quotes', 0)),
+                views=safe_int(row.get('views', 0)),
                 ter_automatic=ter_data['ter_sqrt'],
                 ter_linear=ter_data['ter_linear'],
                 weighted_engagement=ter_data['weighted_engagement'],
@@ -442,6 +474,102 @@ def get_archived_posts():
     })
 
 
+@app.route('/api/posts/favorites', methods=['GET'])
+def get_favorite_posts():
+    """Alle favorisierten Posts abrufen (session-übergreifend)"""
+    sort_by = request.args.get('sort', 'created_at')
+    order = request.args.get('order', 'desc')
+
+    # NUR favorisierte Posts
+    query = TwitterPost.query.filter_by(is_favorite=True)
+
+    # Sortierung
+    if sort_by == 'ter_automatic':
+        query = query.order_by(TwitterPost.ter_automatic.desc() if order == 'desc' else TwitterPost.ter_automatic.asc())
+    elif sort_by == 'ter_manual':
+        query = query.order_by(TwitterPost.ter_manual.desc() if order == 'desc' else TwitterPost.ter_manual.asc())
+    elif sort_by == 'views':
+        query = query.order_by(TwitterPost.views.desc() if order == 'desc' else TwitterPost.views.asc())
+    elif sort_by == 'followers':
+        query = query.order_by(TwitterPost.twitter_followers.desc() if order == 'desc' else TwitterPost.twitter_followers.asc())
+    else:
+        query = query.order_by(TwitterPost.created_at.desc() if order == 'desc' else TwitterPost.created_at.asc())
+
+    posts = query.all()
+
+    return jsonify({
+        'posts': [post.to_dict() for post in posts],
+        'total': len(posts)
+    })
+
+
+@app.route('/api/posts/favorites/export', methods=['GET'])
+def export_favorites_csv():
+    """Favoriten als CSV exportieren - im gleichen Format wie beim Import"""
+    from flask import make_response
+
+    # Alle favorisierten Posts holen
+    posts = TwitterPost.query.filter_by(is_favorite=True).order_by(TwitterPost.created_at.desc()).all()
+
+    if not posts:
+        return jsonify({'error': 'Keine Favoriten zum Exportieren vorhanden'}), 404
+
+    # CSV im Speicher erstellen
+    output = io.StringIO()
+
+    # CSV-Felder definieren (exakt wie beim Import)
+    fieldnames = [
+        'factcheck_url',
+        'factcheck_title',
+        'factcheck_date',
+        'factcheck_rating',
+        'twitter_url',
+        'twitter_author',
+        'twitter_handle',
+        'twitter_followers',
+        'twitter_content',
+        'twitter_date',
+        'likes',
+        'retweets',
+        'replies',
+        'bookmarks',
+        'quotes',
+        'views'
+    ]
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    # Posts schreiben
+    for post in posts:
+        writer.writerow({
+            'factcheck_url': post.factcheck_url or '',
+            'factcheck_title': post.factcheck_title or '',
+            'factcheck_date': post.factcheck_date or '',
+            'factcheck_rating': post.factcheck_rating or '',
+            'twitter_url': post.twitter_url or '',
+            'twitter_author': post.twitter_author or '',
+            'twitter_handle': post.twitter_handle or '',
+            'twitter_followers': post.twitter_followers or 0,
+            'twitter_content': post.twitter_content or '',
+            'twitter_date': post.twitter_date or '',
+            # Nutze manuelle Werte falls vorhanden, sonst automatische
+            'likes': post.likes_manual if post.likes_manual is not None else post.likes,
+            'retweets': post.retweets_manual if post.retweets_manual is not None else post.retweets,
+            'replies': post.replies_manual if post.replies_manual is not None else post.replies,
+            'bookmarks': post.bookmarks_manual if post.bookmarks_manual is not None else post.bookmarks,
+            'quotes': post.quotes_manual if post.quotes_manual is not None else post.quotes,
+            'views': post.views_manual if post.views_manual is not None else post.views
+        })
+
+    # Response erstellen
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=favoriten_export_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+
+    return response
+
+
 @app.route('/api/posts/<int:post_id>', methods=['GET'])
 def get_post(post_id):
     """Einzelnen Post abrufen"""
@@ -485,6 +613,10 @@ def update_post(post_id):
     if 'is_archived' in data:
         post.is_archived = bool(data['is_archived'])
 
+    # Favoriten-Status
+    if 'is_favorite' in data:
+        post.is_favorite = bool(data['is_favorite'])
+
     # Notizen
     if 'notes' in data:
         post.notes = data['notes']
@@ -492,6 +624,10 @@ def update_post(post_id):
     # Twitter-Datum
     if 'twitter_date' in data:
         post.twitter_date = data['twitter_date']
+
+    # Zugriffsdatum
+    if 'access_date' in data:
+        post.access_date = data['access_date']
 
     # Trigger (Intensität 0-5)
     if 'trigger_angst' in data:
@@ -535,8 +671,20 @@ def delete_post(post_id):
 
 @app.route('/api/stats', methods=['GET'])
 def get_statistics():
-    """Deskriptive Statistiken berechnen - NUR FÜR REVIEWED POSTS (OHNE ARCHIVIERTE)"""
-    all_posts = TwitterPost.query.all()
+    """Deskriptive Statistiken berechnen - NUR FÜR REVIEWED POSTS DER AKTIVEN SESSION (OHNE ARCHIVIERTE)"""
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({
+            'error': 'Keine aktive Session',
+            'total_posts': 0,
+            'reviewed_posts': 0,
+            'unreviewed_posts': 0,
+            'archived_posts': 0
+        })
+
+    # NUR Posts der aktiven Session
+    all_posts = TwitterPost.query.filter_by(session_id=active_session.id).all()
 
     # Archivierte Posts zählen
     archived_posts = [p for p in all_posts if p.is_archived]
@@ -616,8 +764,14 @@ def get_statistics():
 
 @app.route('/api/stats/distribution', methods=['GET'])
 def get_distribution():
-    """Verteilungsdaten für Charts"""
-    posts = TwitterPost.query.all()
+    """Verteilungsdaten für Charts - NUR AKTIVE SESSION"""
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'ter_distribution': {}, 'posts_by_date': {}})
+
+    # NUR Posts der aktiven Session
+    posts = TwitterPost.query.filter_by(session_id=active_session.id).all()
 
     # TER-Verteilung (Bins)
     ter_bins = [0, 1, 2, 5, 10, 20, 50, 100, float('inf')]
@@ -639,13 +793,21 @@ def get_distribution():
 
 @app.route('/api/stats/timeline', methods=['GET'])
 def get_timeline_stats():
-    """Zeitreihen-Statistiken für Charts - NUR REVIEWED POSTS"""
+    """Zeitreihen-Statistiken für Charts - NUR REVIEWED POSTS DER AKTIVEN SESSION"""
     from collections import defaultdict
     from datetime import datetime as dt
 
-    # NUR REVIEWED POSTS
-    # NUR REVIEWED POSTS (OHNE ARCHIVIERTE)
-    all_posts = TwitterPost.query.filter_by(is_reviewed=True, is_archived=False).all()
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'monthly': [], 'yearly': []})
+
+    # NUR REVIEWED POSTS DER AKTIVEN SESSION (OHNE ARCHIVIERTE)
+    all_posts = TwitterPost.query.filter_by(
+        session_id=active_session.id,
+        is_reviewed=True,
+        is_archived=False
+    ).all()
 
     if not all_posts:
         return jsonify({
@@ -747,14 +909,22 @@ def get_timeline_stats():
 
 @app.route('/api/stats/advanced', methods=['GET'])
 def get_advanced_stats():
-    """Erweiterte statistische Analysen: Korrelation, Regression, Gruppenvergleiche"""
+    """Erweiterte statistische Analysen: Korrelation, Regression, Gruppenvergleiche - NUR AKTIVE SESSION"""
     import numpy as np
     from scipy import stats as scipy_stats
     from sklearn.linear_model import LinearRegression
 
-    # NUR REVIEWED POSTS mit TER-Werten
-    # NUR REVIEWED POSTS (OHNE ARCHIVIERTE)
-    posts = TwitterPost.query.filter_by(is_reviewed=True, is_archived=False).all()
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'error': 'Keine aktive Session', 'post_count': 0})
+
+    # NUR REVIEWED POSTS DER AKTIVEN SESSION mit TER-Werten (OHNE ARCHIVIERTE)
+    posts = TwitterPost.query.filter_by(
+        session_id=active_session.id,
+        is_reviewed=True,
+        is_archived=False
+    ).all()
     posts = [p for p in posts if p.ter_manual is not None and p.ter_manual >= 0]
 
     if len(posts) < 3:
@@ -1120,6 +1290,905 @@ def get_available_handles():
     return jsonify({
         'handles': sorted_handles,
         'total': len(sorted_handles)
+    })
+
+
+@app.route('/api/posts/reviewed/export-pdf', methods=['GET'])
+def export_reviewed_posts_pdf():
+    """Exportiert reviewed Posts der AKTIVEN SESSION als professionelles PDF"""
+    try:
+        # Aktive Session holen
+        active_session = AnalysisSession.query.filter_by(is_active=True).first()
+        if not active_session:
+            return jsonify({'error': 'Keine aktive Session'}), 400
+
+        # Hole alle reviewed Posts der aktiven Session (ohne archivierte)
+        posts = TwitterPost.query.filter_by(
+            session_id=active_session.id,
+            is_reviewed=True,
+            is_archived=False
+        ).order_by(TwitterPost.ter_manual.desc().nullslast()).all()
+
+        if not posts:
+            return jsonify({'error': 'Keine reviewed Posts zum Exportieren vorhanden'}), 404
+
+        # PDF im Speicher erstellen
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=2*cm,
+            leftMargin=2*cm,
+            topMargin=2*cm,
+            bottomMargin=2*cm
+        )
+
+        # Styles definieren
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=colors.HexColor('#1e3a8a'),
+            spaceAfter=30,
+            alignment=1  # Center
+        )
+
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#1e40af'),
+            spaceAfter=12,
+            spaceBefore=20
+        )
+
+        subheading_style = ParagraphStyle(
+            'CustomSubHeading',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor('#3b82f6'),
+            spaceAfter=8,
+            spaceBefore=12
+        )
+
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            leading=14
+        )
+
+        small_style = ParagraphStyle(
+            'SmallText',
+            parent=styles['Normal'],
+            fontSize=8,
+            leading=10,
+            textColor=colors.grey
+        )
+
+        # Story (Inhalt) erstellen
+        story = []
+
+        # Titel
+        story.append(Paragraph('Twitter Engagement Rate (TER) Analyse', title_style))
+        story.append(Paragraph(f'Reviewed Posts Report - {datetime.now().strftime("%d.%m.%Y %H:%M")}', small_style))
+        story.append(Spacer(1, 0.5*cm))
+
+        # Zusammenfassung
+        story.append(Paragraph('Zusammenfassung', heading_style))
+        summary_data = [
+            ['Anzahl reviewed Posts:', str(len(posts))],
+            ['Durchschnittlicher TER:', f'{statistics.mean([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}' if any(p.ter_manual is not None for p in posts) else 'N/A'],
+            ['Median TER:', f'{statistics.median([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}' if any(p.ter_manual is not None for p in posts) else 'N/A'],
+        ]
+        summary_table = Table(summary_data, colWidths=[5*cm, 5*cm])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#e0e7ff')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        story.append(summary_table)
+        story.append(Spacer(1, 1*cm))
+
+        # Für jeden Post eine detaillierte Seite
+        for idx, post in enumerate(posts, 1):
+            # Seitentrenner (außer beim ersten Post)
+            if idx > 1:
+                story.append(PageBreak())
+
+            # Post-Überschrift
+            story.append(Paragraph(f'Post #{idx}: {post.twitter_author or "Unbekannt"}', heading_style))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#3b82f6')))
+            story.append(Spacer(1, 0.3*cm))
+
+            # Grundinformationen
+            story.append(Paragraph('Grundinformationen', subheading_style))
+
+            # Twitter Content (gekürzt wenn zu lang)
+            content = post.twitter_content or 'Kein Inhalt verfügbar'
+            if len(content) > 500:
+                content = content[:500] + '...'
+
+            info_data = [
+                ['Autor:', post.twitter_author or 'N/A'],
+                ['Handle:', post.twitter_handle or 'N/A'],
+                ['Follower:', f'{post.twitter_followers:,}'.replace(',', '.') if post.twitter_followers else 'N/A'],
+                ['Veröffentlichungsdatum:', post.twitter_date or 'N/A'],
+                ['Zugriffsdatum:', post.access_date or 'N/A'],
+                ['Twitter URL:', Paragraph(f'<link href="{post.twitter_url}">{post.twitter_url[:80]}...</link>', small_style) if post.twitter_url else 'N/A'],
+            ]
+
+            info_table = Table(info_data, colWidths=[4.5*cm, 12*cm])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ]))
+            story.append(info_table)
+            story.append(Spacer(1, 0.3*cm))
+
+            # Post-Inhalt
+            story.append(Paragraph('Post-Inhalt:', ParagraphStyle('BoldNormal', parent=normal_style, fontName='Helvetica-Bold')))
+            story.append(Paragraph(content, normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # Engagement-Metriken
+            story.append(Paragraph('Engagement-Metriken (manuell erfasst)', subheading_style))
+
+            # Verwende manuelle Werte falls vorhanden, sonst automatische
+            views = post.views_manual if post.views_manual is not None else post.views
+            likes = post.likes_manual if post.likes_manual is not None else post.likes
+            retweets = post.retweets_manual if post.retweets_manual is not None else post.retweets
+            replies = post.replies_manual if post.replies_manual is not None else post.replies
+            bookmarks = post.bookmarks_manual if post.bookmarks_manual is not None else post.bookmarks
+            quotes = post.quotes_manual if post.quotes_manual is not None else post.quotes
+
+            engagement_data = [
+                ['Metrik', 'Wert', 'Gewichtung'],
+                ['Views (Impressionen)', f'{views:,}'.replace(',', '.'), '-'],
+                ['Likes', f'{likes:,}'.replace(',', '.'), '× 1'],
+                ['Bookmarks', f'{bookmarks:,}'.replace(',', '.'), '× 2'],
+                ['Replies', f'{replies:,}'.replace(',', '.'), '× 3'],
+                ['Retweets', f'{retweets:,}'.replace(',', '.'), '× 4'],
+                ['Quote Tweets', f'{quotes:,}'.replace(',', '.'), '× 5'],
+            ]
+
+            engagement_table = Table(engagement_data, colWidths=[6*cm, 5*cm, 5*cm])
+            engagement_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+            ]))
+            story.append(engagement_table)
+            story.append(Spacer(1, 0.5*cm))
+
+            # TER-Berechnung
+            story.append(Paragraph('TER-Berechnung (Twitter Engagement Rate)', subheading_style))
+
+            # Berechne TER mit aktuellen Werten
+            weighted_engagement = (
+                (likes * 1) +
+                (bookmarks * 2) +
+                (replies * 3) +
+                (retweets * 4) +
+                (quotes * 5)
+            )
+
+            ter_sqrt = weighted_engagement / math.sqrt(views) if views > 0 else 0
+            ter_manual = post.ter_manual if post.ter_manual is not None else ter_sqrt
+
+            # TER-Gleichung als Paragraph
+            ter_formula = f'TER√ = Gewichtetes Engagement / √Views'
+            ter_calculation = f'TER√ = {weighted_engagement:,} / √{views:,} = {ter_sqrt:.2f}'.replace(',', '.')
+
+            story.append(Paragraph(f'<b>Formel:</b> {ter_formula}', normal_style))
+            story.append(Paragraph(f'<b>Berechnung:</b> {ter_calculation}', normal_style))
+            story.append(Paragraph(f'<b>Gewichtetes Engagement:</b> {weighted_engagement:,}'.replace(',', '.'), normal_style))
+            story.append(Paragraph(f'<b>Manueller TER-Wert:</b> {ter_manual:.2f}' if post.ter_manual is not None else f'<b>TER-Wert:</b> {ter_sqrt:.2f}', normal_style))
+            story.append(Spacer(1, 0.3*cm))
+
+            # TER-Interpretation
+            engagement_level = TERCalculator.get_engagement_level(ter_manual)
+            story.append(Paragraph('<b>Interpretation:</b>', normal_style))
+
+            # Farbige Box für Engagement Level
+            interp_data = [[engagement_level['label']]]
+            interp_table = Table(interp_data, colWidths=[16.5*cm])
+
+            level_colors = {
+                'low': colors.HexColor('#93c5fd'),
+                'medium': colors.HexColor('#86efac'),
+                'high': colors.HexColor('#fdba74'),
+                'very_high': colors.HexColor('#fca5a5')
+            }
+
+            interp_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), level_colors.get(engagement_level['code'], colors.grey)),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1f2937')),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ]))
+            story.append(interp_table)
+            story.append(Spacer(1, 0.2*cm))
+            story.append(Paragraph(engagement_level['description'], normal_style))
+            story.append(Spacer(1, 0.5*cm))
+
+            # Trigger & Frames (falls vorhanden)
+            if any([post.trigger_angst, post.trigger_wut, post.trigger_ekel,
+                    post.trigger_identitaet, post.trigger_hoffnung]):
+                story.append(Paragraph('Emotionale Trigger (Intensität 0-5)', subheading_style))
+
+                trigger_data = [
+                    ['Trigger', 'Intensität'],
+                    ['Angst/Bedrohung', str(post.trigger_angst)],
+                    ['Wut/Empörung', str(post.trigger_wut)],
+                    ['Ekel', str(post.trigger_ekel)],
+                    ['Identitätsbezug', str(post.trigger_identitaet)],
+                    ['Hoffnung/Stolz', str(post.trigger_hoffnung)],
+                ]
+
+                trigger_table = Table(trigger_data, colWidths=[10*cm, 6.5*cm])
+                trigger_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+                ]))
+                story.append(trigger_table)
+                story.append(Spacer(1, 0.3*cm))
+
+            if any([post.frame_opfer_taeter, post.frame_bedrohung, post.frame_verschwoerung,
+                    post.frame_moral, post.frame_historisch]):
+                story.append(Paragraph('Narrative Frames (binär: 0 = nicht vorhanden, 1 = vorhanden)', subheading_style))
+
+                frame_data = [
+                    ['Frame', 'Vorhanden'],
+                    ['Opfer-Täter Frame', '✓' if post.frame_opfer_taeter else '✗'],
+                    ['Bedrohungs-Frame', '✓' if post.frame_bedrohung else '✗'],
+                    ['Verschwörungs-Frame', '✓' if post.frame_verschwoerung else '✗'],
+                    ['Moral-Frame', '✓' if post.frame_moral else '✗'],
+                    ['Historischer Frame', '✓' if post.frame_historisch else '✗'],
+                ]
+
+                frame_table = Table(frame_data, colWidths=[10*cm, 6.5*cm])
+                frame_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ec4899')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                    ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+                ]))
+                story.append(frame_table)
+                story.append(Spacer(1, 0.3*cm))
+
+            # Notizen (falls vorhanden)
+            if post.notes:
+                story.append(Paragraph('Notizen', subheading_style))
+                story.append(Paragraph(post.notes, normal_style))
+
+        # PDF erstellen
+        doc.build(story)
+
+        # Response vorbereiten
+        buffer.seek(0)
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reviewed_posts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+
+        return response
+
+    except Exception as e:
+        print(f"PDF Export Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'PDF-Export fehlgeschlagen: {str(e)}'}), 500
+
+
+@app.route('/api/posts/reviewed/export-excel', methods=['GET'])
+def export_reviewed_posts_excel():
+    """Exportiert reviewed Posts der AKTIVEN SESSION als professionelle Excel-Datei"""
+    try:
+        # Aktive Session holen
+        active_session = AnalysisSession.query.filter_by(is_active=True).first()
+        if not active_session:
+            return jsonify({'error': 'Keine aktive Session'}), 400
+
+        # Hole alle reviewed Posts der aktiven Session (ohne archivierte)
+        posts = TwitterPost.query.filter_by(
+            session_id=active_session.id,
+            is_reviewed=True,
+            is_archived=False
+        ).order_by(TwitterPost.ter_manual.desc().nullslast()).all()
+
+        if not posts:
+            return jsonify({'error': 'Keine reviewed Posts zum Exportieren vorhanden'}), 404
+
+        # Excel-Workbook erstellen
+        wb = Workbook()
+
+        # Styles definieren
+        header_font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='1e40af', end_color='1e40af', fill_type='solid')
+        subheader_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+        subheader_fill = PatternFill(start_color='3b82f6', end_color='3b82f6', fill_type='solid')
+
+        title_font = Font(name='Calibri', size=16, bold=True, color='1e3a8a')
+        normal_font = Font(name='Calibri', size=10)
+        bold_font = Font(name='Calibri', size=10, bold=True)
+
+        center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        left_alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+
+        thin_border = Border(
+            left=Side(style='thin', color='D0D0D0'),
+            right=Side(style='thin', color='D0D0D0'),
+            top=Side(style='thin', color='D0D0D0'),
+            bottom=Side(style='thin', color='D0D0D0')
+        )
+
+        # ========== SHEET 1: Zusammenfassung ==========
+        ws_summary = wb.active
+        ws_summary.title = "Zusammenfassung"
+
+        # Titel
+        ws_summary['A1'] = 'Twitter Engagement Rate (TER) Analyse - Reviewed Posts'
+        ws_summary['A1'].font = title_font
+        ws_summary.merge_cells('A1:D1')
+
+        ws_summary['A2'] = f'Erstellt am: {datetime.now().strftime("%d.%m.%Y %H:%M")}'
+        ws_summary['A2'].font = Font(name='Calibri', size=9, italic=True)
+        ws_summary.merge_cells('A2:D2')
+
+        # Statistiken
+        row = 4
+        ws_summary[f'A{row}'] = 'Metrik'
+        ws_summary[f'B{row}'] = 'Wert'
+        ws_summary[f'A{row}'].font = header_font
+        ws_summary[f'B{row}'].font = header_font
+        ws_summary[f'A{row}'].fill = header_fill
+        ws_summary[f'B{row}'].fill = header_fill
+        ws_summary[f'A{row}'].alignment = center_alignment
+        ws_summary[f'B{row}'].alignment = center_alignment
+
+        summary_data = [
+            ('Anzahl reviewed Posts', len(posts)),
+            ('Durchschnittlicher TER',
+             f'{statistics.mean([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}'
+             if any(p.ter_manual is not None for p in posts) else 'N/A'),
+            ('Median TER',
+             f'{statistics.median([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}'
+             if any(p.ter_manual is not None for p in posts) else 'N/A'),
+            ('Min TER',
+             f'{min([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}'
+             if any(p.ter_manual is not None for p in posts) else 'N/A'),
+            ('Max TER',
+             f'{max([p.ter_manual for p in posts if p.ter_manual is not None]):.2f}'
+             if any(p.ter_manual is not None for p in posts) else 'N/A'),
+        ]
+
+        for idx, (label, value) in enumerate(summary_data, start=row+1):
+            ws_summary[f'A{idx}'] = label
+            ws_summary[f'B{idx}'] = value
+            ws_summary[f'A{idx}'].font = bold_font
+            ws_summary[f'A{idx}'].border = thin_border
+            ws_summary[f'B{idx}'].border = thin_border
+            ws_summary[f'B{idx}'].alignment = center_alignment
+
+        ws_summary.column_dimensions['A'].width = 30
+        ws_summary.column_dimensions['B'].width = 20
+
+        # ========== SHEET 2: Alle Posts (Übersicht) ==========
+        ws_overview = wb.create_sheet(title="Posts Übersicht")
+
+        # Header
+        headers = [
+            '#', 'Autor', 'Handle', 'Follower', 'Veröffentlichungsdatum',
+            'Zugriffsdatum', 'TER Manuell', 'TER Auto', 'TER Linear',
+            'Views', 'Likes', 'Bookmarks', 'Replies', 'Retweets', 'Quotes',
+            'Weighted Engagement', 'Total Interactions', 'Engagement Level',
+            'Twitter URL', 'Content (Vorschau)'
+        ]
+
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws_overview.cell(row=1, column=col_num)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_alignment
+            cell.border = thin_border
+
+        # Daten
+        for idx, post in enumerate(posts, start=2):
+            # Verwende manuelle Werte falls vorhanden
+            views = post.views_manual if post.views_manual is not None else post.views
+            likes = post.likes_manual if post.likes_manual is not None else post.likes
+            retweets = post.retweets_manual if post.retweets_manual is not None else post.retweets
+            replies = post.replies_manual if post.replies_manual is not None else post.replies
+            bookmarks = post.bookmarks_manual if post.bookmarks_manual is not None else post.bookmarks
+            quotes = post.quotes_manual if post.quotes_manual is not None else post.quotes
+
+            content_preview = (post.twitter_content[:100] + '...') if post.twitter_content and len(post.twitter_content) > 100 else (post.twitter_content or '')
+
+            row_data = [
+                idx - 1,
+                post.twitter_author or 'N/A',
+                post.twitter_handle or 'N/A',
+                post.twitter_followers or 0,
+                post.twitter_date or 'N/A',
+                post.access_date or 'N/A',
+                post.ter_manual if post.ter_manual is not None else 'N/A',
+                post.ter_automatic,
+                post.ter_linear,
+                views,
+                likes,
+                bookmarks,
+                replies,
+                retweets,
+                quotes,
+                post.weighted_engagement,
+                post.total_interactions,
+                post.engagement_level or 'N/A',
+                post.twitter_url or 'N/A',
+                content_preview
+            ]
+
+            for col_num, value in enumerate(row_data, start=1):
+                cell = ws_overview.cell(row=idx, column=col_num)
+                cell.value = value
+                cell.font = normal_font
+                cell.border = thin_border
+
+                if col_num in [1, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]:  # Numerische/Center Spalten
+                    cell.alignment = center_alignment
+                else:
+                    cell.alignment = left_alignment
+
+        # Spaltenbreiten
+        ws_overview.column_dimensions['A'].width = 5
+        ws_overview.column_dimensions['B'].width = 20
+        ws_overview.column_dimensions['C'].width = 15
+        ws_overview.column_dimensions['D'].width = 12
+        ws_overview.column_dimensions['E'].width = 18
+        ws_overview.column_dimensions['F'].width = 15
+        ws_overview.column_dimensions['G'].width = 12
+        ws_overview.column_dimensions['H'].width = 12
+        ws_overview.column_dimensions['I'].width = 12
+        ws_overview.column_dimensions['J'].width = 12
+        ws_overview.column_dimensions['K'].width = 10
+        ws_overview.column_dimensions['L'].width = 12
+        ws_overview.column_dimensions['M'].width = 10
+        ws_overview.column_dimensions['N'].width = 12
+        ws_overview.column_dimensions['O'].width = 10
+        ws_overview.column_dimensions['P'].width = 18
+        ws_overview.column_dimensions['Q'].width = 16
+        ws_overview.column_dimensions['R'].width = 30
+        ws_overview.column_dimensions['S'].width = 40
+        ws_overview.column_dimensions['T'].width = 50
+
+        # ========== SHEET 3: Detaillierte Post-Analyse ==========
+        ws_details = wb.create_sheet(title="Detaillierte Analyse")
+
+        current_row = 1
+
+        for post_idx, post in enumerate(posts, start=1):
+            # Post-Header
+            ws_details.merge_cells(f'A{current_row}:F{current_row}')
+            header_cell = ws_details[f'A{current_row}']
+            header_cell.value = f'Post #{post_idx}: {post.twitter_author or "Unbekannt"}'
+            header_cell.font = Font(name='Calibri', size=14, bold=True, color='FFFFFF')
+            header_cell.fill = PatternFill(start_color='1e40af', end_color='1e40af', fill_type='solid')
+            header_cell.alignment = center_alignment
+            current_row += 1
+
+            # Grundinformationen
+            ws_details[f'A{current_row}'] = 'Grundinformationen'
+            ws_details[f'A{current_row}'].font = subheader_font
+            ws_details[f'A{current_row}'].fill = subheader_fill
+            ws_details.merge_cells(f'A{current_row}:B{current_row}')
+            current_row += 1
+
+            info_data = [
+                ('Autor', post.twitter_author or 'N/A'),
+                ('Handle', post.twitter_handle or 'N/A'),
+                ('Follower', f'{post.twitter_followers:,}'.replace(',', '.') if post.twitter_followers else 'N/A'),
+                ('Veröffentlichungsdatum', post.twitter_date or 'N/A'),
+                ('Zugriffsdatum', post.access_date or 'N/A'),
+                ('Twitter URL', post.twitter_url or 'N/A'),
+            ]
+
+            for label, value in info_data:
+                ws_details[f'A{current_row}'] = label
+                ws_details[f'B{current_row}'] = value
+                ws_details[f'A{current_row}'].font = bold_font
+                ws_details[f'A{current_row}'].border = thin_border
+                ws_details[f'B{current_row}'].border = thin_border
+                ws_details[f'B{current_row}'].alignment = left_alignment
+                current_row += 1
+
+            # Post-Inhalt
+            ws_details[f'A{current_row}'] = 'Post-Inhalt'
+            ws_details[f'A{current_row}'].font = bold_font
+            current_row += 1
+
+            ws_details[f'A{current_row}'] = post.twitter_content or 'Kein Inhalt verfügbar'
+            ws_details[f'A{current_row}'].alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+            ws_details.merge_cells(f'A{current_row}:F{current_row}')
+            ws_details.row_dimensions[current_row].height = 60
+            current_row += 2
+
+            # Engagement-Metriken
+            ws_details[f'A{current_row}'] = 'Engagement-Metriken (manuell erfasst)'
+            ws_details[f'A{current_row}'].font = subheader_font
+            ws_details[f'A{current_row}'].fill = subheader_fill
+            ws_details.merge_cells(f'A{current_row}:C{current_row}')
+            current_row += 1
+
+            # Header für Metriken
+            ws_details[f'A{current_row}'] = 'Metrik'
+            ws_details[f'B{current_row}'] = 'Wert'
+            ws_details[f'C{current_row}'] = 'Gewichtung'
+            for col in ['A', 'B', 'C']:
+                ws_details[f'{col}{current_row}'].font = bold_font
+                ws_details[f'{col}{current_row}'].fill = PatternFill(start_color='E0E7FF', end_color='E0E7FF', fill_type='solid')
+                ws_details[f'{col}{current_row}'].alignment = center_alignment
+                ws_details[f'{col}{current_row}'].border = thin_border
+            current_row += 1
+
+            # Verwende manuelle Werte falls vorhanden
+            views = post.views_manual if post.views_manual is not None else post.views
+            likes = post.likes_manual if post.likes_manual is not None else post.likes
+            retweets = post.retweets_manual if post.retweets_manual is not None else post.retweets
+            replies = post.replies_manual if post.replies_manual is not None else post.replies
+            bookmarks = post.bookmarks_manual if post.bookmarks_manual is not None else post.bookmarks
+            quotes = post.quotes_manual if post.quotes_manual is not None else post.quotes
+
+            metrics_data = [
+                ('Views (Impressionen)', views, '-'),
+                ('Likes', likes, '× 1'),
+                ('Bookmarks', bookmarks, '× 2'),
+                ('Replies', replies, '× 3'),
+                ('Retweets', retweets, '× 4'),
+                ('Quote Tweets', quotes, '× 5'),
+            ]
+
+            for metric, value, weight in metrics_data:
+                ws_details[f'A{current_row}'] = metric
+                ws_details[f'B{current_row}'] = value
+                ws_details[f'C{current_row}'] = weight
+                ws_details[f'A{current_row}'].border = thin_border
+                ws_details[f'B{current_row}'].border = thin_border
+                ws_details[f'C{current_row}'].border = thin_border
+                ws_details[f'B{current_row}'].alignment = center_alignment
+                ws_details[f'C{current_row}'].alignment = center_alignment
+                current_row += 1
+
+            current_row += 1
+
+            # TER-Berechnung
+            ws_details[f'A{current_row}'] = 'TER-Berechnung (Twitter Engagement Rate)'
+            ws_details[f'A{current_row}'].font = subheader_font
+            ws_details[f'A{current_row}'].fill = subheader_fill
+            ws_details.merge_cells(f'A{current_row}:C{current_row}')
+            current_row += 1
+
+            weighted_engagement = (
+                (likes * 1) + (bookmarks * 2) + (replies * 3) +
+                (retweets * 4) + (quotes * 5)
+            )
+            ter_sqrt = weighted_engagement / math.sqrt(views) if views > 0 else 0
+            ter_manual = post.ter_manual if post.ter_manual is not None else ter_sqrt
+
+            ter_calc_data = [
+                ('Formel', 'TER√ = Gewichtetes Engagement / √Views'),
+                ('Berechnung', f'TER√ = {weighted_engagement:,} / √{views:,} = {ter_sqrt:.2f}'.replace(',', '.')),
+                ('Gewichtetes Engagement', f'{weighted_engagement:,}'.replace(',', '.')),
+                ('Manueller TER-Wert' if post.ter_manual is not None else 'TER-Wert', f'{ter_manual:.2f}'),
+            ]
+
+            for label, value in ter_calc_data:
+                ws_details[f'A{current_row}'] = label
+                ws_details[f'B{current_row}'] = value
+                ws_details[f'A{current_row}'].font = bold_font
+                ws_details[f'A{current_row}'].border = thin_border
+                ws_details[f'B{current_row}'].border = thin_border
+                ws_details.merge_cells(f'B{current_row}:C{current_row}')
+                current_row += 1
+
+            # TER-Interpretation
+            engagement_level = TERCalculator.get_engagement_level(ter_manual)
+            ws_details[f'A{current_row}'] = 'Interpretation'
+            ws_details[f'A{current_row}'].font = bold_font
+            current_row += 1
+
+            ws_details[f'A{current_row}'] = engagement_level['label']
+            ws_details.merge_cells(f'A{current_row}:C{current_row}')
+
+            # Farbcodierung
+            level_colors = {
+                'low': '93c5fd',
+                'medium': '86efac',
+                'high': 'fdba74',
+                'very_high': 'fca5a5'
+            }
+            ws_details[f'A{current_row}'].fill = PatternFill(
+                start_color=level_colors.get(engagement_level['code'], 'D0D0D0'),
+                end_color=level_colors.get(engagement_level['code'], 'D0D0D0'),
+                fill_type='solid'
+            )
+            ws_details[f'A{current_row}'].font = Font(name='Calibri', size=11, bold=True)
+            ws_details[f'A{current_row}'].alignment = center_alignment
+            current_row += 1
+
+            ws_details[f'A{current_row}'] = engagement_level['description']
+            ws_details.merge_cells(f'A{current_row}:C{current_row}')
+            current_row += 2
+
+            # Trigger (falls vorhanden)
+            if any([post.trigger_angst, post.trigger_wut, post.trigger_ekel,
+                    post.trigger_identitaet, post.trigger_hoffnung]):
+                ws_details[f'A{current_row}'] = 'Emotionale Trigger (Intensität 0-5)'
+                ws_details[f'A{current_row}'].font = subheader_font
+                ws_details[f'A{current_row}'].fill = subheader_fill
+                ws_details.merge_cells(f'A{current_row}:B{current_row}')
+                current_row += 1
+
+                trigger_data = [
+                    ('Angst/Bedrohung', post.trigger_angst),
+                    ('Wut/Empörung', post.trigger_wut),
+                    ('Ekel', post.trigger_ekel),
+                    ('Identitätsbezug', post.trigger_identitaet),
+                    ('Hoffnung/Stolz', post.trigger_hoffnung),
+                ]
+
+                for label, value in trigger_data:
+                    ws_details[f'A{current_row}'] = label
+                    ws_details[f'B{current_row}'] = value
+                    ws_details[f'A{current_row}'].border = thin_border
+                    ws_details[f'B{current_row}'].border = thin_border
+                    ws_details[f'B{current_row}'].alignment = center_alignment
+                    current_row += 1
+
+                current_row += 1
+
+            # Frames (falls vorhanden)
+            if any([post.frame_opfer_taeter, post.frame_bedrohung, post.frame_verschwoerung,
+                    post.frame_moral, post.frame_historisch]):
+                ws_details[f'A{current_row}'] = 'Narrative Frames (✓ = vorhanden)'
+                ws_details[f'A{current_row}'].font = subheader_font
+                ws_details[f'A{current_row}'].fill = subheader_fill
+                ws_details.merge_cells(f'A{current_row}:B{current_row}')
+                current_row += 1
+
+                frame_data = [
+                    ('Opfer-Täter Frame', '✓' if post.frame_opfer_taeter else '✗'),
+                    ('Bedrohungs-Frame', '✓' if post.frame_bedrohung else '✗'),
+                    ('Verschwörungs-Frame', '✓' if post.frame_verschwoerung else '✗'),
+                    ('Moral-Frame', '✓' if post.frame_moral else '✗'),
+                    ('Historischer Frame', '✓' if post.frame_historisch else '✗'),
+                ]
+
+                for label, value in frame_data:
+                    ws_details[f'A{current_row}'] = label
+                    ws_details[f'B{current_row}'] = value
+                    ws_details[f'A{current_row}'].border = thin_border
+                    ws_details[f'B{current_row}'].border = thin_border
+                    ws_details[f'B{current_row}'].alignment = center_alignment
+                    current_row += 1
+
+                current_row += 1
+
+            # Notizen (falls vorhanden)
+            if post.notes:
+                ws_details[f'A{current_row}'] = 'Notizen'
+                ws_details[f'A{current_row}'].font = bold_font
+                current_row += 1
+
+                ws_details[f'A{current_row}'] = post.notes
+                ws_details[f'A{current_row}'].alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+                ws_details.merge_cells(f'A{current_row}:F{current_row}')
+                current_row += 1
+
+            # Trenner zwischen Posts
+            current_row += 3
+
+        # Spaltenbreiten für Details-Sheet
+        ws_details.column_dimensions['A'].width = 30
+        ws_details.column_dimensions['B'].width = 35
+        ws_details.column_dimensions['C'].width = 20
+        ws_details.column_dimensions['D'].width = 20
+        ws_details.column_dimensions['E'].width = 20
+        ws_details.column_dimensions['F'].width = 20
+
+        # Excel-Datei im Speicher speichern
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # Response erstellen
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = f'attachment; filename=reviewed_posts_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+
+        return response
+
+    except Exception as e:
+        print(f"Excel Export Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Excel-Export fehlgeschlagen: {str(e)}'}), 500
+
+
+@app.route('/api/factcheckers', methods=['GET'])
+def get_available_factcheckers():
+    """Alle verfügbaren Faktenchecker (basierend auf factcheck_url Domain) für aktive Session abrufen"""
+    from urllib.parse import urlparse
+
+    # Mapping: Domain -> "Country, Factchecker Name"
+    FACTCHECKER_MAPPING = {
+        # Austria
+        'mimikama.at': 'Austria, Mimikama',
+        'dpa-factchecking.com': 'Austria, dpa-factchecking.com',
+
+        # Belgium
+        'factuel.afp.com': 'Belgium, AFP Factuel',
+        'factcheck.vlaanderen': 'Belgium, Factcheck Vlaanderen',
+        'knack.be': 'Belgium, Knack',
+
+        # Bulgaria
+        'factcheck.bg': 'Bulgaria, AFP Proveri',
+
+        # Croatia
+        'provjeris.hr': 'Croatia, Provera činjenica',
+
+        # Czech Republic
+        'demagog.cz': 'Czech Republic, Demagog.cz',
+        'afp.com': 'Czech Republic, AFP Na pravou míru',
+
+        # Denmark
+        'tjekdet.dk': 'Denmark, TjekDet',
+
+        # Estonia
+        'news.err.ee': 'Estonia, Eesti Päevaleht',
+
+        # Finland
+        'faktabaari.fi': 'Finland, AFP Faktankartistus',
+
+        # France
+        'factuel.afp.com': 'France, AFP Factuel',
+        'factcheck.afp.com': 'France, AFP Factcheck',
+
+        # Germany
+        'correctiv.org': 'Germany, Correctiv',
+        'dpa-factchecking.com': 'Germany, dpa-factchecking.com',
+        'afp.com': 'Germany, AFP Faktencheck',
+
+        # Greece
+        'ellinikahoaxes.gr': 'Greece, Ellinika Hoaxes',
+        'factcheck.gr': 'Greece, AFP Factcheck Greek',
+
+        # Hungary
+        'afp.com': 'Hungary, AFP Ténykérdés',
+
+        # Ireland
+        'thejournal.ie': 'Ireland, The Journal - FactCheck',
+
+        # Italy
+        'facta.news': 'Italy, Facta News',
+        'pagella.it': 'Italy, PagellaPolitica',
+
+        # Lithuania
+        '15min.lt': 'Lithuania, 15min',
+        'delfi.lt': 'Lithuania, Delfi',
+
+        # Luxembourg
+        'dpa-factchecking.com': 'Luxembourg, dpa-factchecking.com',
+
+        # Netherlands
+        'afp.com': 'Netherlands, AFP',
+        'nieuwscheckers.nl': 'Netherlands, Nieuwscheckers',
+
+        # Norway
+        'faktisk.no': 'Norway, Faktisk',
+
+        # Poland
+        'demagog.org.pl': 'Poland, Demagog',
+        'afp.com': 'Poland, AFP Sprawdzam',
+
+        # Portugal
+        'poligrafo.pt': 'Portugal, Polígrafo',
+
+        # Romania
+        'afp.com': 'Romania, AFP Verificat',
+
+        # Slovakia
+        'afp.com': 'Slovakia, AFP Fakty',
+
+        # Slovenia
+        'ostro.si': 'Slovenia, Ostro',
+
+        # Spain
+        'verifica.efe.com': 'Spain, EFE Verifica',
+        'afp.com': 'Spain, AFP Factual',
+        'newtral.es': 'Spain, Newtral',
+        'maldita.es': 'Spain, MALDITA.ES',
+
+        # Sweden
+        'kallkritikbyran.se': 'Sweden, Källkritikbyrån',
+
+        # Switzerland
+        'dpa-factchecking.com': 'Switzerland, dpa-factchecking.com',
+
+        # United Kingdom
+        'logicallyfacts.com': 'United Kingdom, Logically Facts',
+    }
+
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'factcheckers': []})
+
+    # Alle Posts der aktiven Session holen (nicht archivierte)
+    posts = TwitterPost.query.filter_by(session_id=active_session.id, is_archived=False).all()
+
+    # Unique Faktenchecker extrahieren (basierend auf Domain der factcheck_url)
+    factcheckers_data = {}
+    for post in posts:
+        if post.factcheck_url:
+            try:
+                parsed_url = urlparse(post.factcheck_url)
+                domain = parsed_url.netloc
+                # Entferne 'www.' Präfix
+                if domain.startswith('www.'):
+                    domain = domain[4:]
+
+                if domain:
+                    # Verwende Mapping oder Fallback zu Domain
+                    display_name = FACTCHECKER_MAPPING.get(domain, domain)
+                    factcheckers_data[domain] = display_name
+            except:
+                # Falls URL-Parsing fehlschlägt, überspringe
+                continue
+
+    # Sortiere nach Display-Name
+    sorted_factcheckers = sorted(factcheckers_data.items(), key=lambda x: x[1])
+
+    return jsonify({
+        'factcheckers': [{'domain': domain, 'name': name} for domain, name in sorted_factcheckers],
+        'total': len(sorted_factcheckers)
     })
 
 
