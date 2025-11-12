@@ -1397,12 +1397,293 @@ def get_advanced_stats():
             print(f"Clustering error: {e}")
             clusters = {'error': 'Clusteranalyse konnte nicht durchgeführt werden'}
 
+    # 6. TRIGGER-INTENSITÄTS-ANALYSE
+    # Berechne Gesamt-Trigger-Intensität (Summe aller Trigger)
+    trigger_intensity = (
+        trigger_angst + trigger_wut + trigger_empoerung +
+        trigger_ekel + trigger_identitaet + trigger_hoffnung
+    )
+
+    intensity_analysis = None
+    try:
+        # Bestimme Quartile für Intensität
+        q25 = np.percentile(trigger_intensity, 25)
+        q75 = np.percentile(trigger_intensity, 75)
+
+        # Definiere Gruppen: Niedrig (untere 25%), Mittel, Hoch (obere 25%)
+        low_intensity_mask = trigger_intensity <= q25
+        medium_intensity_mask = (trigger_intensity > q25) & (trigger_intensity < q75)
+        high_intensity_mask = trigger_intensity >= q75
+
+        # Funktion zum Berechnen von Gruppen-Profil
+        def get_group_profile(mask, group_name):
+            if np.sum(mask) == 0:
+                return None
+
+            group_posts = np.array(posts)[mask]
+
+            # Durchschnittliche Trigger-Werte
+            trigger_profile = {
+                'Angst': round(float(np.mean(trigger_angst[mask])), 2),
+                'Wut': round(float(np.mean(trigger_wut[mask])), 2),
+                'Empörung': round(float(np.mean(trigger_empoerung[mask])), 2),
+                'Ekel': round(float(np.mean(trigger_ekel[mask])), 2),
+                'Identität': round(float(np.mean(trigger_identitaet[mask])), 2),
+                'Hoffnung': round(float(np.mean(trigger_hoffnung[mask])), 2)
+            }
+
+            # Durchschnittliche Frame-Nutzung (Prozent)
+            frame_profile = {
+                'Opfer-Täter': round(float(np.mean(frame_opfer_taeter[mask])) * 100, 1),
+                'Bedrohung': round(float(np.mean(frame_bedrohung[mask])) * 100, 1),
+                'Verschwörung': round(float(np.mean(frame_verschwoerung[mask])) * 100, 1),
+                'Moral': round(float(np.mean(frame_moral[mask])) * 100, 1),
+                'Historisch': round(float(np.mean(frame_historisch[mask])) * 100, 1)
+            }
+
+            # Dominant Trigger (höchster Durchschnittswert)
+            dominant_trigger = max(trigger_profile.items(), key=lambda x: x[1])
+
+            # Häufigste Frames (über 50% Nutzung)
+            common_frames = [name for name, pct in frame_profile.items() if pct >= 50]
+
+            return {
+                'group_name': group_name,
+                'count': int(np.sum(mask)),
+                'avg_intensity': round(float(np.mean(trigger_intensity[mask])), 2),
+                'avg_ter': round(float(np.mean(ter_values[mask])), 2),
+                'std_ter': round(float(np.std(ter_values[mask])), 2),
+                'min_ter': round(float(np.min(ter_values[mask])), 2),
+                'max_ter': round(float(np.max(ter_values[mask])), 2),
+                'trigger_profile': trigger_profile,
+                'dominant_trigger': {'name': dominant_trigger[0], 'value': dominant_trigger[1]},
+                'frame_profile': frame_profile,
+                'common_frames': common_frames
+            }
+
+        # Erstelle Profile für alle Gruppen
+        groups = []
+
+        high_profile = get_group_profile(high_intensity_mask, "Hohe Intensität")
+        if high_profile:
+            groups.append(high_profile)
+
+        medium_profile = get_group_profile(medium_intensity_mask, "Mittlere Intensität")
+        if medium_profile:
+            groups.append(medium_profile)
+
+        low_profile = get_group_profile(low_intensity_mask, "Niedrige Intensität")
+        if low_profile:
+            groups.append(low_profile)
+
+        # Statistische Tests zwischen Hoch und Niedrig
+        comparison = None
+        if high_profile and low_profile and high_profile['count'] >= 2 and low_profile['count'] >= 2:
+            high_ter = ter_values[high_intensity_mask]
+            low_ter = ter_values[low_intensity_mask]
+
+            t_stat, p_value = scipy_stats.ttest_ind(high_ter, low_ter)
+
+            comparison = {
+                'high_vs_low_ttest': {
+                    't_statistic': round(float(t_stat), 3),
+                    'p_value': round(float(p_value), 4),
+                    'significant': bool(p_value < 0.05),
+                    'ter_difference': round(float(np.mean(high_ter) - np.mean(low_ter)), 2)
+                }
+            }
+
+        # Korrelation zwischen Gesamt-Intensität und TER
+        intensity_ter_corr, intensity_ter_p = scipy_stats.pearsonr(trigger_intensity, ter_values)
+
+        intensity_analysis = {
+            'groups': groups,
+            'comparison': comparison,
+            'intensity_ter_correlation': {
+                'correlation': round(float(intensity_ter_corr), 3),
+                'p_value': round(float(intensity_ter_p), 4),
+                'significant': bool(intensity_ter_p < 0.05)
+            },
+            'overall_stats': {
+                'min_intensity': round(float(np.min(trigger_intensity)), 2),
+                'max_intensity': round(float(np.max(trigger_intensity)), 2),
+                'mean_intensity': round(float(np.mean(trigger_intensity)), 2),
+                'q25': round(float(q25), 2),
+                'q75': round(float(q75), 2)
+            }
+        }
+
+    except Exception as e:
+        print(f"Intensity analysis error: {e}")
+        intensity_analysis = {'error': 'Trigger-Intensitäts-Analyse konnte nicht durchgeführt werden'}
+
+    # 7. AUTOMATISCHE INTERPRETATION
+    interpretations = []
+
+    try:
+        # Interpretation 1: Trigger-Intensität und TER Zusammenhang
+        if intensity_analysis and 'intensity_ter_correlation' in intensity_analysis:
+            corr = intensity_analysis['intensity_ter_correlation']['correlation']
+            significant = intensity_analysis['intensity_ter_correlation']['significant']
+
+            if significant:
+                if corr > 0.5:
+                    interpretations.append({
+                        'icon': '🔥✅',
+                        'title': 'Starker positiver Effekt: Hohe Trigger-Intensität = Hohes Engagement',
+                        'finding': f'Es gibt einen starken positiven Zusammenhang (r = {corr}) zwischen Trigger-Intensität und TER.',
+                        'meaning': 'Posts mit mehr emotionalen Triggern (Wut, Angst, Empörung, etc.) erzielen signifikant höhere Engagement-Raten.',
+                        'recommendation': '💡 Empfehlung: Nutze emotionale Trigger bewusst, um das Engagement zu steigern. Achte auf eine Kombination mehrerer Trigger für maximale Wirkung.'
+                    })
+                elif corr > 0.3:
+                    interpretations.append({
+                        'icon': '📈',
+                        'title': 'Moderater positiver Effekt: Trigger-Intensität erhöht Engagement',
+                        'finding': f'Es gibt einen mittleren positiven Zusammenhang (r = {corr}) zwischen Trigger-Intensität und TER.',
+                        'meaning': 'Posts mit mehr emotionalen Triggern tendieren zu höherem Engagement, aber andere Faktoren spielen ebenfalls eine wichtige Rolle.',
+                        'recommendation': '💡 Empfehlung: Emotionale Trigger sind wichtig, aber kombiniere sie mit guten Frames und relevanten Inhalten.'
+                    })
+                elif corr < -0.3:
+                    interpretations.append({
+                        'icon': '⚠️',
+                        'title': 'Negativer Effekt: Zu viele Trigger schaden dem Engagement',
+                        'finding': f'Es gibt einen negativen Zusammenhang (r = {corr}) zwischen Trigger-Intensität und TER.',
+                        'meaning': 'Posts mit sehr vielen emotionalen Triggern erzielen NIEDRIGERES Engagement. Möglicherweise wirken sie zu überladen oder unglaubwürdig.',
+                        'recommendation': '💡 Empfehlung: Weniger ist mehr! Fokussiere dich auf 1-2 starke Trigger statt viele schwache.'
+                    })
+                else:
+                    interpretations.append({
+                        'icon': '📊',
+                        'title': 'Schwacher Zusammenhang zwischen Trigger-Intensität und Engagement',
+                        'finding': f'Es gibt nur einen schwachen Zusammenhang (r = {corr}) zwischen Trigger-Intensität und TER.',
+                        'meaning': 'Die reine Anzahl/Intensität der Trigger ist nicht der Hauptfaktor für Engagement. Andere Faktoren (z.B. welche Trigger, welche Frames, Timing) sind wichtiger.',
+                        'recommendation': '💡 Empfehlung: Achte mehr auf die QUALITÄT und KOMBINATION der Trigger statt auf die reine Intensität.'
+                    })
+            else:
+                interpretations.append({
+                    'icon': '❓',
+                    'title': 'Kein signifikanter Zusammenhang zwischen Trigger-Intensität und Engagement',
+                    'finding': 'Die Korrelation ist statistisch nicht signifikant.',
+                    'meaning': 'In deinen Daten gibt es keinen klaren Zusammenhang zwischen der Gesamtzahl der Trigger und dem Engagement.',
+                    'recommendation': '💡 Empfehlung: Untersuche spezifische Trigger einzeln - vielleicht sind bestimmte Trigger wirksam, während andere nicht funktionieren.'
+                })
+
+        # Interpretation 2: Gruppenvergleich Hoch vs. Niedrig
+        if intensity_analysis and 'comparison' in intensity_analysis and intensity_analysis['comparison']:
+            comp = intensity_analysis['comparison']['high_vs_low_ttest']
+            ter_diff = comp['ter_difference']
+            significant = comp['significant']
+
+            if significant:
+                if ter_diff > 5:
+                    interpretations.append({
+                        'icon': '🎯',
+                        'title': 'Hohe Intensität deutlich erfolgreicher',
+                        'finding': f'Posts mit hoher Trigger-Intensität haben {ter_diff}% höheren TER als Posts mit niedriger Intensität.',
+                        'meaning': 'Emotional stark aufgeladene Posts performen signifikant besser.',
+                        'recommendation': '💡 Strategie: Setze auf emotional intensive Inhalte. Kombiniere mehrere starke Trigger.'
+                    })
+                elif ter_diff > 0:
+                    interpretations.append({
+                        'icon': '📊',
+                        'title': 'Hohe Intensität leicht erfolgreicher',
+                        'finding': f'Posts mit hoher Trigger-Intensität haben {ter_diff}% höheren TER.',
+                        'meaning': 'Mehr emotionale Trigger helfen, aber der Effekt ist moderat.',
+                        'recommendation': '💡 Strategie: Emotionale Trigger sind nützlich, aber achte auch auf andere Faktoren (Frames, Timing, Content-Qualität).'
+                    })
+                elif ter_diff < -5:
+                    interpretations.append({
+                        'icon': '⚠️',
+                        'title': 'Niedrige Intensität erfolgreicher!',
+                        'finding': f'Posts mit NIEDRIGER Trigger-Intensität haben {abs(ter_diff)}% HÖHEREN TER als intensive Posts.',
+                        'meaning': 'Überraschend: Weniger emotionale Posts performen besser. Möglicherweise wirken zu intensive Posts unglaubwürdig oder abstoßend.',
+                        'recommendation': '💡 Strategie: Setze auf subtilere emotionale Ansprache. Qualität vor Quantität bei Triggern.'
+                    })
+
+        # Interpretation 3: Dominant Triggers in erfolgreichen Gruppen
+        if intensity_analysis and 'groups' in intensity_analysis:
+            groups = intensity_analysis['groups']
+
+            # Finde Gruppe mit höchstem TER
+            if len(groups) > 0:
+                best_group = max(groups, key=lambda g: g['avg_ter'])
+                worst_group = min(groups, key=lambda g: g['avg_ter'])
+
+                interpretations.append({
+                    'icon': '🏆',
+                    'title': f'Erfolgreichste Strategie: {best_group["group_name"]}',
+                    'finding': f'Die Gruppe "{best_group["group_name"]}" erzielt den höchsten durchschnittlichen TER von {best_group["avg_ter"]}%.',
+                    'meaning': f'Der dominante Trigger in dieser Gruppe ist "{best_group["dominant_trigger"]["name"]}" mit Intensität {best_group["dominant_trigger"]["value"]}. ' +
+                              (f'Häufig genutzte Frames: {", ".join(best_group["common_frames"])}.' if best_group["common_frames"] else 'Es werden keine Frames dominant genutzt (< 50%).'),
+                    'recommendation': f'💡 Erfolgsrezept: Fokussiere dich auf {best_group["dominant_trigger"]["name"]}-Trigger' +
+                                    (f' in Kombination mit {", ".join(best_group["common_frames"])}-Frames.' if best_group["common_frames"] else '.')
+                })
+
+                if worst_group['avg_ter'] < best_group['avg_ter'] - 3:
+                    interpretations.append({
+                        'icon': '⚠️',
+                        'title': f'Weniger erfolgreich: {worst_group["group_name"]}',
+                        'finding': f'Die Gruppe "{worst_group["group_name"]}" erzielt nur {worst_group["avg_ter"]}% TER (Differenz: {round(best_group["avg_ter"] - worst_group["avg_ter"], 2)}%).',
+                        'meaning': f'Der dominante Trigger hier ist "{worst_group["dominant_trigger"]["name"]}". ' +
+                                  (f'Frames: {", ".join(worst_group["common_frames"])}.' if worst_group["common_frames"] else 'Kaum Frame-Nutzung.'),
+                        'recommendation': f'💡 Vermeide: Die Kombination von {worst_group["dominant_trigger"]["name"]} mit niedriger Gesamtintensität scheint weniger effektiv zu sein.'
+                    })
+
+        # Interpretation 4: Frame-Muster Analyse
+        if intensity_analysis and 'groups' in intensity_analysis:
+            for group in intensity_analysis['groups']:
+                if group['common_frames'] and len(group['common_frames']) >= 2:
+                    interpretations.append({
+                        'icon': '🎭',
+                        'title': f'Frame-Muster bei {group["group_name"]}',
+                        'finding': f'Bei {group["group_name"]} werden häufig folgende Frames kombiniert: {", ".join(group["common_frames"])}.',
+                        'meaning': f'Diese Frame-Kombination erzielt {group["avg_ter"]}% TER in Verbindung mit {group["dominant_trigger"]["name"]}-Trigger.',
+                        'recommendation': f'💡 Frame-Strategie: {"Diese Kombination funktioniert gut - nutze sie weiter!" if group["avg_ter"] > 12 else "Diese Kombination ist ausbaufähig - teste andere Frame-Kombinationen."}'
+                    })
+
+        # Interpretation 5: Einzelne Trigger-Korrelationen (Top 3)
+        if correlations:
+            sorted_corrs = sorted(
+                [(name, data) for name, data in correlations.items() if 'Angst' in name or 'Wut' in name or 'Empörung' in name or 'Ekel' in name or 'Identität' in name or 'Hoffnung' in name],
+                key=lambda x: abs(x[1]['correlation']),
+                reverse=True
+            )[:3]
+
+            if sorted_corrs:
+                trigger_insights = []
+                for name, data in sorted_corrs:
+                    if data['significant']:
+                        direction = "positiv" if data['correlation'] > 0 else "negativ"
+                        strength = "stark" if abs(data['correlation']) > 0.5 else "moderat"
+                        trigger_insights.append(f"• **{name}**: {strength} {direction} (r = {data['correlation']})")
+
+                if trigger_insights:
+                    interpretations.append({
+                        'icon': '🔍',
+                        'title': 'Wichtigste einzelne Trigger',
+                        'finding': 'Die stärksten Zusammenhänge mit TER haben:',
+                        'meaning': '\n'.join(trigger_insights),
+                        'recommendation': '💡 Fokus: Priorisiere diese Trigger bei der Content-Erstellung.'
+                    })
+
+    except Exception as e:
+        print(f"Interpretation error: {e}")
+        interpretations.append({
+            'icon': '⚠️',
+            'title': 'Fehler bei der Interpretation',
+            'finding': 'Die automatische Interpretation konnte nicht vollständig durchgeführt werden.',
+            'meaning': str(e),
+            'recommendation': 'Bitte überprüfe die Rohdaten in den anderen Statistik-Sektionen.'
+        })
+
     return jsonify({
         'descriptive': descriptive,
         'correlations': correlations,
         'regression': regression,
         'group_comparisons': group_comparisons,
-        'clusters': clusters
+        'clusters': clusters,
+        'intensity_analysis': intensity_analysis,
+        'interpretations': interpretations
     })
 
 

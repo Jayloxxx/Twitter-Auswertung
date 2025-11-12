@@ -2658,6 +2658,256 @@
                         </div> <!-- End Cluster Results -->
                     </div> <!-- End Clusteranalyse -->
 
+                    <!-- Trigger-Intensitäts-Analyse -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-2">🔥 Trigger-Intensitäts-Analyse</h3>
+                        <p class="text-sm text-gray-600 mb-4">Vergleich zwischen Posts mit hoher, mittlerer und niedriger Gesamt-Trigger-Intensität</p>
+
+                        <!-- Error Message -->
+                        <div x-show="advancedStats?.intensity_analysis?.error" class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                            <p class="text-yellow-700" x-text="advancedStats?.intensity_analysis?.error || ''"></p>
+                        </div>
+
+                        <!-- Overall Correlation -->
+                        <div x-show="advancedStats?.intensity_analysis && !advancedStats.intensity_analysis.error">
+                            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="font-bold text-gray-900 mb-1">Gesamt-Korrelation: Trigger-Intensität ↔ TER</h4>
+                                        <p class="text-sm text-gray-600">
+                                            Korrelation:
+                                            <span class="font-bold text-lg"
+                                                  :class="Math.abs(advancedStats?.intensity_analysis?.intensity_ter_correlation?.correlation || 0) > 0.5 ? 'text-red-600' :
+                                                         Math.abs(advancedStats?.intensity_analysis?.intensity_ter_correlation?.correlation || 0) > 0.3 ? 'text-orange-600' : 'text-gray-600'"
+                                                  x-text="advancedStats?.intensity_analysis?.intensity_ter_correlation?.correlation"></span>
+                                            <span class="text-xs text-gray-500">
+                                                (p = <span x-text="advancedStats?.intensity_analysis?.intensity_ter_correlation?.p_value"></span>)
+                                            </span>
+                                            <span x-show="advancedStats?.intensity_analysis?.intensity_ter_correlation?.significant"
+                                                  class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                ✓ Signifikant
+                                            </span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Intensity Groups Comparison -->
+                            <div class="space-y-6">
+                                <template x-for="group in advancedStats?.intensity_analysis?.groups || []" :key="group.group_name">
+                                    <div class="border-2 rounded-lg p-5"
+                                         :class="group.group_name === 'Hohe Intensität' ? 'border-red-500 bg-red-50' :
+                                                group.group_name === 'Mittlere Intensität' ? 'border-yellow-500 bg-yellow-50' :
+                                                'border-green-500 bg-green-50'">
+
+                                        <!-- Header -->
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 class="text-lg font-bold text-gray-900 flex items-center">
+                                                    <span x-show="group.group_name === 'Hohe Intensität'">🔥</span>
+                                                    <span x-show="group.group_name === 'Mittlere Intensität'">📊</span>
+                                                    <span x-show="group.group_name === 'Niedrige Intensität'">❄️</span>
+                                                    <span class="ml-2" x-text="group.group_name"></span>
+                                                </h4>
+                                                <div class="text-sm text-gray-600 mt-1">
+                                                    <span x-text="group.count"></span> Posts |
+                                                    Ø Intensität: <span class="font-bold" x-text="group.avg_intensity"></span>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-xs text-gray-600">Durchschnittlicher TER</div>
+                                                <div class="text-3xl font-bold"
+                                                     :class="group.avg_ter > 15 ? 'text-green-600' : group.avg_ter > 10 ? 'text-yellow-600' : 'text-red-600'"
+                                                     x-text="group.avg_ter + '%'"></div>
+                                                <div class="text-xs text-gray-500">
+                                                    Range: <span x-text="group.min_ter + '% - ' + group.max_ter + '%'"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Trigger Profile -->
+                                        <div class="mb-4">
+                                            <h5 class="text-sm font-semibold text-gray-700 mb-2">
+                                                📈 Trigger-Profil (Ø Intensität pro Trigger)
+                                                <span class="ml-2 text-xs font-normal text-gray-500">
+                                                    Dominant: <span class="font-bold text-primary" x-text="group.dominant_trigger.name"></span>
+                                                    (<span x-text="group.dominant_trigger.value"></span>)
+                                                </span>
+                                            </h5>
+                                            <div class="grid grid-cols-3 md:grid-cols-6 gap-3">
+                                                <template x-for="[trigger, value] in Object.entries(group.trigger_profile)" :key="trigger">
+                                                    <div class="text-center">
+                                                        <div class="text-2xl font-bold"
+                                                             :class="trigger === group.dominant_trigger.name ? 'text-primary' : 'text-gray-600'"
+                                                             x-text="value"></div>
+                                                        <div class="text-xs text-gray-600" x-text="trigger"></div>
+                                                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                                            <div class="bg-primary h-2 rounded-full"
+                                                                 :style="'width: ' + (value / 5 * 100) + '%'"></div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <!-- Frame Profile -->
+                                        <div>
+                                            <h5 class="text-sm font-semibold text-gray-700 mb-2">
+                                                🎭 Frame-Nutzung (% der Posts)
+                                                <span x-show="group.common_frames.length > 0" class="ml-2 text-xs font-normal text-gray-500">
+                                                    Häufigste: <span class="font-bold" x-text="group.common_frames.join(', ')"></span>
+                                                </span>
+                                                <span x-show="group.common_frames.length === 0" class="ml-2 text-xs font-normal text-gray-500">
+                                                    Keine dominanten Frames (< 50%)
+                                                </span>
+                                            </h5>
+                                            <div class="grid grid-cols-5 gap-3">
+                                                <template x-for="[frame, pct] in Object.entries(group.frame_profile)" :key="frame">
+                                                    <div class="text-center">
+                                                        <div class="text-xl font-bold"
+                                                             :class="pct >= 50 ? 'text-primary' : 'text-gray-600'"
+                                                             x-text="pct + '%'"></div>
+                                                        <div class="text-xs text-gray-600" x-text="frame"></div>
+                                                        <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                                            <div class="bg-primary h-2 rounded-full"
+                                                                 :style="'width: ' + pct + '%'"></div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Statistical Comparison -->
+                            <div x-show="advancedStats?.intensity_analysis?.comparison" class="mt-6 bg-purple-50 border-l-4 border-purple-500 p-5 rounded">
+                                <h4 class="font-bold text-gray-900 mb-3">📊 Statistischer Vergleich: Hohe vs. Niedrige Intensität</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <div class="text-sm text-gray-600">TER-Differenz</div>
+                                        <div class="text-2xl font-bold"
+                                             :class="advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.ter_difference > 0 ? 'text-green-600' : 'text-red-600'"
+                                             x-text="(advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.ter_difference > 0 ? '+' : '') +
+                                                    advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.ter_difference + '%'"></div>
+                                        <div class="text-xs text-gray-500">Hohe minus Niedrige Intensität</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm text-gray-600">Statistische Signifikanz</div>
+                                        <div class="text-lg">
+                                            <span x-show="advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.significant"
+                                                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
+                                                ✓ Signifikant unterschiedlich
+                                            </span>
+                                            <span x-show="!advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.significant"
+                                                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-800">
+                                                ✗ Nicht signifikant unterschiedlich
+                                            </span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            t = <span x-text="advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.t_statistic"></span>,
+                                            p = <span x-text="advancedStats?.intensity_analysis?.comparison?.high_vs_low_ttest?.p_value"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Interpretation Guide -->
+                            <div class="mt-6 text-xs text-gray-500 bg-blue-50 p-4 rounded">
+                                <strong>💡 Interpretation dieser Analyse:</strong>
+                                <ul class="list-disc ml-5 mt-2 space-y-1">
+                                    <li><strong>Trigger-Intensität:</strong> Summe aller Trigger-Werte (0-30 Skala). Hohe Werte = emotional stark aufgeladener Content</li>
+                                    <li><strong>Gruppierung:</strong> Posts werden in 3 Gruppen eingeteilt (untere 25%, mittlere 50%, obere 25% der Intensität)</li>
+                                    <li><strong>Dominant Trigger:</strong> Der Trigger mit dem höchsten Durchschnittswert in dieser Gruppe</li>
+                                    <li><strong>Häufigste Frames:</strong> Frames die in mindestens 50% der Posts dieser Gruppe verwendet werden</li>
+                                    <li><strong>Schlussfolgerungen:</strong> Vergleiche die TER-Werte zwischen den Gruppen - welche Trigger-Intensität und Frame-Kombination führt zu höherem Engagement?</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div> <!-- End Trigger-Intensitäts-Analyse -->
+
+                    <!-- Automatische Interpretationen -->
+                    <div class="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg shadow-lg p-6 border-2 border-purple-300">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                            <span class="mr-3">🧠</span>
+                            Automatische Interpretation deiner Ergebnisse
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-6">
+                            Basierend auf den statistischen Analysen: Was bedeuten die Zahlen für deine Forschung?
+                        </p>
+
+                        <!-- Error Message -->
+                        <div x-show="!advancedStats?.interpretations || advancedStats.interpretations.length === 0"
+                             class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                            <p class="text-yellow-700">Keine Interpretationen verfügbar. Stelle sicher, dass genügend Daten vorhanden sind.</p>
+                        </div>
+
+                        <!-- Interpretations List -->
+                        <div x-show="advancedStats?.interpretations && advancedStats.interpretations.length > 0"
+                             class="space-y-4">
+                            <template x-for="(interp, index) in advancedStats?.interpretations || []" :key="index">
+                                <div class="bg-white rounded-lg shadow-md border-l-4 overflow-hidden"
+                                     :class="interp.icon.includes('✅') || interp.icon.includes('🏆') ? 'border-green-500' :
+                                            interp.icon.includes('⚠️') ? 'border-red-500' :
+                                            interp.icon.includes('🎯') ? 'border-blue-500' :
+                                            'border-gray-400'">
+
+                                    <!-- Header -->
+                                    <div class="bg-gradient-to-r p-4"
+                                         :class="interp.icon.includes('✅') || interp.icon.includes('🏆') ? 'from-green-50 to-green-100' :
+                                                interp.icon.includes('⚠️') ? 'from-red-50 to-red-100' :
+                                                interp.icon.includes('🎯') ? 'from-blue-50 to-blue-100' :
+                                                'from-gray-50 to-gray-100'">
+                                        <h4 class="text-lg font-bold text-gray-900 flex items-center">
+                                            <span class="text-2xl mr-3" x-text="interp.icon"></span>
+                                            <span x-text="interp.title"></span>
+                                        </h4>
+                                    </div>
+
+                                    <!-- Content -->
+                                    <div class="p-4 space-y-3">
+                                        <!-- Finding -->
+                                        <div class="bg-blue-50 rounded-lg p-3">
+                                            <div class="text-xs font-semibold text-blue-900 uppercase mb-1">📊 Ergebnis</div>
+                                            <div class="text-sm text-gray-800" x-text="interp.finding"></div>
+                                        </div>
+
+                                        <!-- Meaning -->
+                                        <div class="bg-purple-50 rounded-lg p-3">
+                                            <div class="text-xs font-semibold text-purple-900 uppercase mb-1">💭 Was bedeutet das?</div>
+                                            <div class="text-sm text-gray-800 whitespace-pre-line" x-text="interp.meaning"></div>
+                                        </div>
+
+                                        <!-- Recommendation -->
+                                        <div class="bg-green-50 rounded-lg p-3 border-l-4 border-green-500">
+                                            <div class="text-xs font-semibold text-green-900 uppercase mb-1">💡 Handlungsempfehlung</div>
+                                            <div class="text-sm font-medium text-green-900" x-text="interp.recommendation"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Summary Box -->
+                        <div x-show="advancedStats?.interpretations && advancedStats.interpretations.length > 0"
+                             class="mt-6 bg-white rounded-lg border-2 border-indigo-300 p-4">
+                            <h5 class="font-bold text-gray-900 mb-2">📚 Zusammenfassung für deine Masterarbeit</h5>
+                            <p class="text-sm text-gray-700">
+                                Diese Interpretationen basieren auf statistischen Analysen deiner Daten. Sie helfen dir dabei:
+                            </p>
+                            <ul class="list-disc ml-5 mt-2 text-sm text-gray-700 space-y-1">
+                                <li><strong>Muster zu erkennen:</strong> Welche Trigger-Frame-Kombinationen sind wirksam?</li>
+                                <li><strong>Hypothesen zu testen:</strong> Führen emotionale Trigger zu höherem Engagement?</li>
+                                <li><strong>Strategien abzuleiten:</strong> Welche Content-Strategien sind am erfolgreichsten?</li>
+                                <li><strong>Forschungsfragen zu beantworten:</strong> Konkrete Befunde für deine wissenschaftliche Arbeit</li>
+                            </ul>
+                            <p class="text-xs text-gray-500 mt-3 italic">
+                                💡 Tipp: Nutze diese Interpretationen als Basis für die Diskussion in deiner Masterarbeit.
+                                Verweise auf die konkreten statistischen Werte (Korrelationen, p-Werte) aus den anderen Sektionen.
+                            </p>
+                        </div>
+                    </div> <!-- End Automatische Interpretationen -->
+
                 </div>
             </div>
 
