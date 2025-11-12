@@ -1,0 +1,4 @@
+twitter_url,trigger_angst,trigger_wut,trigger_ekel,trigger_identitaet,trigger_hoffnung,frame_opfer_taeter,frame_bedrohung,frame_verschwoerung,frame_moral,frame_historisch
+https://twitter.com/example1/status/123456789,4,3,2,5,1,1,1,0,1,0
+https://twitter.com/example2/status/987654321,2,4,3,3,2,0,1,1,1,0
+https://twitter.com/example3/status/555555555,5,5,4,4,0,1,1,1,0,1

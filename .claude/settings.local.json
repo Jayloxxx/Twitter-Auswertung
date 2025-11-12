@@ -3,7 +3,11 @@
     "allow": [
       "Bash(del test_export.pdf 2)",
       "Bash(nul)",
-      "Bash(del test_export.xlsx 2)"
+      "Bash(del test_export.xlsx 2)",
+      "Bash(dir:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

@@ -1586,6 +1586,15 @@
 
                         <!-- Export Buttons -->
                         <div class="flex items-center space-x-3">
+                            <!-- CSV Export Button -->
+                            <button @click="exportReviewedPostsCSV()"
+                                    class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                                CSV Export
+                            </button>
+
                             <!-- PDF Export Button -->
                             <button @click="exportReviewedPostsPDF()"
                                     class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
@@ -2090,7 +2099,8 @@
                             <h4 class="font-bold mb-2">📊 Emotionale Trigger (0-5)</h4>
                             <ul class="space-y-1 text-gray-700">
                                 <li><strong>Angst/Bedrohung:</strong> Schutzreflexe, defensive Einstellungen</li>
-                                <li><strong>Wut/Empörung:</strong> Moralische Verurteilung, hohe Aktivierung</li>
+                                <li><strong>Wut:</strong> Ärger, Frustration, aggressive Emotionen</li>
+                                <li><strong>Empörung:</strong> Moralische Verurteilung, hohe Aktivierung</li>
                                 <li><strong>Ekel:</strong> Abwertung, Entmenschlichung</li>
                                 <li><strong>Identitätsbezug:</strong> "Wir vs. Sie"-Dynamik, Polarisierung</li>
                                 <li><strong>Hoffnung/Stolz:</strong> Positive Mobilisierung</li>
@@ -2106,6 +2116,71 @@
                                 <li><strong>Historisch:</strong> Bezug auf Geschichte, Tradition</li>
                             </ul>
                         </div>
+                    </div>
+                </div>
+
+                <!-- CSV Import Bereich für Trigger & Frames -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <div class="flex items-center mb-4">
+                        <svg class="w-6 h-6 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <h3 class="text-lg font-bold text-gray-900">📁 Trigger & Frames CSV Import</h3>
+                    </div>
+
+                    <p class="text-sm text-gray-600 mb-4">
+                        Importiere eine CSV-Datei mit Trigger- und Frame-Codierungen. Die Datei wird automatisch zu den bestehenden Posts gematcht (via <code class="bg-gray-100 px-2 py-1 rounded text-xs">twitter_url</code>).
+                    </p>
+
+                    <!-- CSV Format Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <h4 class="font-semibold text-blue-900 mb-2">📋 Erforderliches Dateiformat:</h4>
+                        <div class="text-xs text-blue-800 font-mono bg-white p-3 rounded border border-blue-200 overflow-x-auto">
+                            <code>twitter_url,trigger_angst,trigger_wut,trigger_empoerung,trigger_ekel,trigger_identitaet,trigger_hoffnung,frame_opfer_taeter,frame_bedrohung,frame_verschwoerung,frame_moral,frame_historisch</code>
+                        </div>
+                        <ul class="text-sm text-blue-800 mt-3 space-y-1">
+                            <li><strong>Formate:</strong> CSV (Komma-getrennt) oder TXT (Tab-getrennt)</li>
+                            <li><strong>twitter_url:</strong> Pflichtfeld zum Matching mit bestehenden Posts</li>
+                            <li><strong>Trigger (0-5):</strong> trigger_angst, trigger_wut, trigger_empoerung, trigger_ekel, trigger_identitaet, trigger_hoffnung</li>
+                            <li><strong>Frames (0-1):</strong> frame_opfer_taeter, frame_bedrohung, frame_verschwoerung, frame_moral, frame_historisch</li>
+                        </ul>
+                    </div>
+
+                    <!-- Upload Form -->
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
+                        <input type="file"
+                               id="triggersFramesFile"
+                               accept=".csv,.txt"
+                               class="hidden"
+                               @change="handleTriggersFramesUpload($event)">
+
+                        <label for="triggersFramesFile" class="cursor-pointer">
+                            <div class="flex flex-col items-center">
+                                <svg class="w-12 h-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <p class="text-sm text-gray-600 mb-2">
+                                    <span class="text-purple-600 font-semibold hover:text-purple-700">CSV-Datei auswählen</span>
+                                    oder hierher ziehen
+                                </p>
+                                <p class="text-xs text-gray-500">CSV oder TXT Dateien erlaubt</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Upload Status -->
+                    <div x-show="triggersFramesUploadStatus.message"
+                         class="mt-4 p-4 rounded-lg"
+                         :class="{
+                            'bg-green-50 border border-green-200 text-green-800': triggersFramesUploadStatus.success,
+                            'bg-red-50 border border-red-200 text-red-800': !triggersFramesUploadStatus.success
+                         }">
+                        <p class="text-sm font-medium" x-text="triggersFramesUploadStatus.message"></p>
+                        <p x-show="triggersFramesUploadStatus.matched !== null"
+                           class="text-xs mt-2">
+                            ✓ <span x-text="triggersFramesUploadStatus.matched"></span> Posts aktualisiert,
+                            ✗ <span x-text="triggersFramesUploadStatus.not_matched"></span> nicht gefunden
+                        </p>
                     </div>
                 </div>
 
@@ -2138,6 +2213,7 @@
                                         triggers: {
                                             angst: post.trigger_angst || 0,
                                             wut: post.trigger_wut || 0,
+                                            empoerung: post.trigger_empoerung || 0,
                                             ekel: post.trigger_ekel || 0,
                                             identitaet: post.trigger_identitaet || 0,
                                             hoffnung: post.trigger_hoffnung || 0
@@ -2220,7 +2296,7 @@
                                         <h5 class="text-sm font-bold text-gray-800 mb-3 flex items-center">
                                             <span class="text-lg mr-2">📊</span> Emotionale Trigger (Intensität 0-5)
                                         </h5>
-                                        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                                        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-700 mb-1">Angst/Bedrohung</label>
                                                 <input type="number" min="0" max="5" x-model.number="triggers.angst"
@@ -2228,9 +2304,15 @@
                                                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500">
                                             </div>
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-700 mb-1">Wut/Empörung</label>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Wut</label>
                                                 <input type="number" min="0" max="5" x-model.number="triggers.wut"
                                                        @input="clampValue('wut')"
+                                                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-medium text-gray-700 mb-1">Empörung</label>
+                                                <input type="number" min="0" max="5" x-model.number="triggers.empoerung"
+                                                       @input="clampValue('empoerung')"
                                                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500">
                                             </div>
                                             <div>
@@ -2293,6 +2375,7 @@
                                         <button @click="saveTriggerFrame(post.id, {
                                             trigger_angst: triggers.angst,
                                             trigger_wut: triggers.wut,
+                                            trigger_empoerung: triggers.empoerung,
                                             trigger_ekel: triggers.ekel,
                                             trigger_identitaet: triggers.identitaet,
                                             trigger_hoffnung: triggers.hoffnung,
@@ -2833,6 +2916,12 @@
                 dragOver: false,
                 selectedFile: null,
                 uploadResult: null,
+                triggersFramesUploadStatus: {
+                    message: '',
+                    success: false,
+                    matched: null,
+                    not_matched: null
+                },
 
                 // Notifications
                 notifications: [],
@@ -2934,43 +3023,8 @@
 
                 // Computed Properties
                 get reviewedPosts() {
-                    return this.posts.filter(p => {
-                        // Filter by reviewed status
-                        if (!p.is_reviewed) return false;
-
-                        // Filter by selected handles (only if handles are selected)
-                        if (this.selectedHandles.length > 0) {
-                            // Check if post's handle is in selected handles
-                            if (!this.selectedHandles.includes(p.twitter_handle)) {
-                                return false;
-                            }
-                        }
-
-                        // Filter by selected factcheckers (only if factcheckers are selected)
-                        if (this.selectedFactcheckers.length > 0) {
-                            // Extract domain from factcheck_url and check if it's in selected factcheckers
-                            if (p.factcheck_url) {
-                                try {
-                                    const url = new URL(p.factcheck_url);
-                                    let domain = url.hostname;
-                                    // Remove 'www.' prefix
-                                    if (domain.startsWith('www.')) {
-                                        domain = domain.substring(4);
-                                    }
-                                    if (!this.selectedFactcheckers.includes(domain)) {
-                                        return false;
-                                    }
-                                } catch {
-                                    return false;
-                                }
-                            } else {
-                                // If factcheckers are selected but post has no factcheck_url, exclude it
-                                return false;
-                            }
-                        }
-
-                        return true;
-                    });
+                    // Reviewed Posts Tab sollte ALLE reviewed Posts zeigen, ohne Handle/Factchecker Filter
+                    return this.posts.filter(p => p.is_reviewed);
                 },
 
                 get paginatedPosts() {
@@ -3514,6 +3568,60 @@
                     }
                 },
 
+                async handleTriggersFramesUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    // Reset status
+                    this.triggersFramesUploadStatus = {
+                        message: '',
+                        success: false,
+                        matched: null,
+                        not_matched: null
+                    };
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        const response = await fetch('/api/upload-triggers-frames', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.triggersFramesUploadStatus = {
+                                message: data.message,
+                                success: true,
+                                matched: data.matched,
+                                not_matched: data.not_matched
+                            };
+
+                            // Reload posts after successful import
+                            await this.loadPosts();
+                        } else {
+                            this.triggersFramesUploadStatus = {
+                                message: data.error || 'Import fehlgeschlagen',
+                                success: false,
+                                matched: null,
+                                not_matched: null
+                            };
+                        }
+                    } catch (error) {
+                        this.triggersFramesUploadStatus = {
+                            message: 'Fehler beim Upload: ' + error.message,
+                            success: false,
+                            matched: null,
+                            not_matched: null
+                        };
+                    }
+
+                    // Reset file input
+                    event.target.value = '';
+                },
+
                 // Post Actions
                 async updateManualTER(postId, value) {
                     const terValue = value && value !== '' ? parseFloat(value) : null;
@@ -4022,6 +4130,7 @@
                         const data = {
                             trigger_angst: post.trigger_angst || 0,
                             trigger_wut: post.trigger_wut || 0,
+                            trigger_empoerung: post.trigger_empoerung || 0,
                             trigger_ekel: post.trigger_ekel || 0,
                             trigger_identitaet: post.trigger_identitaet || 0,
                             trigger_hoffnung: post.trigger_hoffnung || 0,
@@ -4036,6 +4145,7 @@
                         const triggerValues = [
                             data.trigger_angst,
                             data.trigger_wut,
+                            data.trigger_empoerung,
                             data.trigger_ekel,
                             data.trigger_identitaet,
                             data.trigger_hoffnung
@@ -4207,6 +4317,35 @@
                     } catch (error) {
                         console.error('Excel Export Error:', error);
                         this.showNotification('Excel-Export fehlgeschlagen: ' + error.message, 'error');
+                    }
+                },
+
+                async exportReviewedPostsCSV() {
+                    try {
+                        this.showNotification('CSV-Datei wird erstellt...', 'info');
+
+                        const response = await fetch('/api/posts/reviewed/export-csv');
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.error || 'Export fehlgeschlagen');
+                        }
+
+                        // CSV als Blob herunterladen
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `reviewed_posts_export_${new Date().toISOString().slice(0,10)}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+
+                        this.showNotification(`CSV erfolgreich erstellt! (${this.reviewedPosts.length} Posts)`, 'success');
+                    } catch (error) {
+                        console.error('CSV Export Error:', error);
+                        this.showNotification('CSV-Export fehlgeschlagen: ' + error.message, 'error');
                     }
                 },
 
