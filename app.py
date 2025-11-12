@@ -120,6 +120,7 @@ class TwitterPost(db.Model):
     # Trigger (Intensität 0-5)
     trigger_angst = db.Column(db.Integer, default=0)
     trigger_wut = db.Column(db.Integer, default=0)
+    trigger_empoerung = db.Column(db.Integer, default=0)
     trigger_ekel = db.Column(db.Integer, default=0)
     trigger_identitaet = db.Column(db.Integer, default=0)
     trigger_hoffnung = db.Column(db.Integer, default=0)
@@ -176,6 +177,7 @@ class TwitterPost(db.Model):
             'engagement_level_code': self.engagement_level_code,
             'trigger_angst': self.trigger_angst,
             'trigger_wut': self.trigger_wut,
+            'trigger_empoerung': self.trigger_empoerung,
             'trigger_ekel': self.trigger_ekel,
             'trigger_identitaet': self.trigger_identitaet,
             'trigger_hoffnung': self.trigger_hoffnung,
@@ -330,9 +332,20 @@ def upload_csv():
         TwitterPost.query.filter_by(session_id=active_session.id).delete()
         db.session.commit()
 
-        # CSV-Datei lesen
-        stream = io.StringIO(file.stream.read().decode('utf-8'), newline=None)
-        csv_reader = csv.DictReader(stream)
+        # CSV-Datei lesen mit verschiedenen Encoding-Versuchen
+        raw_data = file.stream.read()
+
+        # Versuche verschiedene Encodings
+        for encoding in ['utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1']:
+            try:
+                decoded_data = raw_data.decode(encoding)
+                stream = io.StringIO(decoded_data, newline=None)
+                csv_reader = csv.DictReader(stream)
+                break
+            except (UnicodeDecodeError, UnicodeError):
+                if encoding == 'iso-8859-1':  # Letzter Versuch
+                    return jsonify({'error': f'CSV-Datei konnte nicht gelesen werden. Bitte stelle sicher, dass die Datei UTF-8 codiert ist.'}), 400
+                continue
 
         imported_count = 0
         skipped_count = 0
@@ -397,6 +410,186 @@ def upload_csv():
             'imported': imported_count,
             'skipped': skipped_count,
             'total': imported_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Import fehlgeschlagen: {str(e)}'}), 500
+
+
+@app.route('/api/upload-triggers-frames', methods=['POST'])
+def upload_triggers_frames_csv():
+    """CSV/TXT-Datei mit Trigger & Frames hochladen und zu bestehenden Posts matchen"""
+    if 'file' not in request.files:
+        return jsonify({'error': 'Keine Datei hochgeladen'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'Keine Datei ausgewählt'}), 400
+
+    if not (file.filename.endswith('.csv') or file.filename.endswith('.txt')):
+        return jsonify({'error': 'Nur CSV- und TXT-Dateien erlaubt'}), 400
+
+    try:
+        # Aktive Session holen
+        active_session = AnalysisSession.query.filter_by(is_active=True).first()
+        if not active_session:
+            return jsonify({'error': 'Keine aktive Session. Bitte erstelle zuerst eine Session.'}), 400
+
+        # Datei lesen mit verschiedenen Encoding-Versuchen
+        raw_data = file.stream.read()
+
+        # Versuche verschiedene Encodings
+        csv_reader = None
+        for encoding in ['utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1']:
+            try:
+                decoded_data = raw_data.decode(encoding)
+                stream = io.StringIO(decoded_data, newline=None)
+
+                # Bestimme Delimiter: Tab für .txt, Komma für .csv
+                delimiter = '\t' if file.filename.endswith('.txt') else ','
+                csv_reader = csv.DictReader(stream, delimiter=delimiter)
+
+                # Teste ob Reader funktioniert durch Lesen der ersten Zeile
+                first_row = next(csv_reader, None)
+                if first_row:
+                    # Reset stream für vollständiges Lesen
+                    stream = io.StringIO(decoded_data, newline=None)
+                    csv_reader = csv.DictReader(stream, delimiter=delimiter)
+                break
+            except (UnicodeDecodeError, UnicodeError):
+                if encoding == 'iso-8859-1':  # Letzter Versuch
+                    return jsonify({'error': f'Datei konnte nicht gelesen werden. Bitte stelle sicher, dass die Datei UTF-8 codiert ist.'}), 400
+                continue
+            except Exception:
+                continue
+
+        matched_count = 0
+        not_matched_count = 0
+        updated_posts = []
+
+        # Debug Info sammeln
+        all_db_urls = [p.twitter_url for p in TwitterPost.query.filter_by(session_id=active_session.id).all()]
+        csv_urls = []
+        debug_info = []
+
+        for row in csv_reader:
+            # Spaltennamen-Mapping: TXT-Dateien haben andere Namen
+            # TXT: "Twitter URL", "Angst Score", etc.
+            # CSV: "twitter_url", "trigger_angst", etc.
+            twitter_url = row.get('twitter_url') or row.get('Twitter URL', '')
+            twitter_url = twitter_url.strip() if twitter_url else ''
+            csv_urls.append(twitter_url)
+
+            # Sammle Debug-Info für erste 3 URLs
+            if len(debug_info) < 3:
+                debug_info.append({
+                    'csv_url': twitter_url,
+                    'csv_url_length': len(twitter_url),
+                    'has_leading_space': twitter_url != twitter_url.lstrip(),
+                    'has_trailing_space': twitter_url != twitter_url.rstrip()
+                })
+
+            if not twitter_url:
+                not_matched_count += 1
+                continue
+
+            # Extrahiere Twitter-URL aus web.archive.org URLs
+            # Format: https://web.archive.org/web/20231005123845/https://twitter.com/...
+            clean_url = twitter_url
+            if 'web.archive.org' in twitter_url:
+                # Finde die eigentliche Twitter-URL
+                import re
+                match = re.search(r'https://(?:twitter|x)\.com/[^/]+/status/\d+', twitter_url)
+                if match:
+                    clean_url = match.group(0)
+
+            # Entferne Query-Parameter (?s=46&t=...)
+            clean_url = clean_url.split('?')[0]
+
+            # Suche nach Post mit dieser URL in der aktiven Session
+            # Versuche exaktes Match mit bereinigter URL
+            post = TwitterPost.query.filter_by(
+                session_id=active_session.id,
+                twitter_url=clean_url
+            ).first()
+
+            # Falls nicht gefunden, versuche mit originalem URL
+            if not post and clean_url != twitter_url:
+                post = TwitterPost.query.filter_by(
+                    session_id=active_session.id,
+                    twitter_url=twitter_url
+                ).first()
+
+            if not post:
+                not_matched_count += 1
+                continue
+
+            # Trigger aktualisieren (Intensität 0-5)
+            # Unterstützt beide Formate: CSV (trigger_angst) und TXT (Angst Score)
+            angst = row.get('trigger_angst') or row.get('Angst Score', 0)
+            post.trigger_angst = safe_int(angst, 0)
+
+            wut = row.get('trigger_wut') or row.get('Wut Score', 0)
+            post.trigger_wut = safe_int(wut, 0)
+
+            empoerung = row.get('trigger_empoerung') or row.get('Empörung Score', 0)
+            post.trigger_empoerung = safe_int(empoerung, 0)
+
+            ekel = row.get('trigger_ekel') or row.get('Ekel Score', 0)
+            post.trigger_ekel = safe_int(ekel, 0)
+
+            identitaet = row.get('trigger_identitaet') or row.get('Identität Score', 0)
+            post.trigger_identitaet = safe_int(identitaet, 0)
+
+            hoffnung = row.get('trigger_hoffnung') or row.get('Hoffnung/Stolz Score', 0)
+            post.trigger_hoffnung = safe_int(hoffnung, 0)
+
+            # Frames aktualisieren (Binär 0-1)
+            # Unterstützt beide Formate: CSV (frame_opfer_taeter) und TXT (Opfer-Täter Frame)
+            opfer_taeter = row.get('frame_opfer_taeter') or row.get('Opfer-Täter Frame', 0)
+            post.frame_opfer_taeter = safe_int(opfer_taeter, 0)
+
+            bedrohung = row.get('frame_bedrohung') or row.get('Bedrohung Frame', 0)
+            post.frame_bedrohung = safe_int(bedrohung, 0)
+
+            verschwoerung = row.get('frame_verschwoerung') or row.get('Verschwörung Frame', 0)
+            post.frame_verschwoerung = safe_int(verschwoerung, 0)
+
+            moral = row.get('frame_moral') or row.get('Moral Frame', 0)
+            post.frame_moral = safe_int(moral, 0)
+
+            historisch = row.get('frame_historisch') or row.get('Historisch Frame', 0)
+            post.frame_historisch = safe_int(historisch, 0)
+
+            post.updated_at = datetime.utcnow()
+            matched_count += 1
+            updated_posts.append({
+                'id': post.id,
+                'twitter_url': post.twitter_url,
+                'twitter_author': post.twitter_author
+            })
+
+        db.session.commit()
+
+        # Session aktualisieren
+        active_session.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Trigger & Frames Import erfolgreich! {matched_count} Posts aktualisiert, {not_matched_count} nicht gefunden.',
+            'session_name': active_session.name,
+            'matched': matched_count,
+            'not_matched': not_matched_count,
+            'updated_posts': updated_posts[:10],  # Zeige erste 10 zur Überprüfung
+            'debug': {
+                'total_posts_in_db': len(all_db_urls),
+                'total_rows_in_csv': len(csv_urls),
+                'sample_db_urls': all_db_urls[:3],
+                'sample_csv_info': debug_info
+            }
         })
 
     except Exception as e:
@@ -570,6 +763,82 @@ def export_favorites_csv():
     return response
 
 
+@app.route('/api/posts/reviewed/export-csv', methods=['GET'])
+def export_reviewed_csv():
+    """Reviewed Posts der AKTIVEN SESSION als CSV exportieren - im gleichen Format wie beim Import"""
+    from flask import make_response
+
+    # Aktive Session holen
+    active_session = AnalysisSession.query.filter_by(is_active=True).first()
+    if not active_session:
+        return jsonify({'error': 'Keine aktive Session'}), 400
+
+    # NUR REVIEWED POSTS DER AKTIVEN SESSION (OHNE ARCHIVIERTE)
+    posts = TwitterPost.query.filter_by(
+        session_id=active_session.id,
+        is_reviewed=True,
+        is_archived=False
+    ).order_by(TwitterPost.created_at.desc()).all()
+
+    if not posts:
+        return jsonify({'error': 'Keine reviewed Posts zum Exportieren vorhanden'}), 404
+
+    # CSV im Speicher erstellen
+    output = io.StringIO()
+
+    # CSV-Felder definieren (exakt wie beim Import)
+    fieldnames = [
+        'factcheck_url',
+        'factcheck_title',
+        'factcheck_date',
+        'factcheck_rating',
+        'twitter_url',
+        'twitter_author',
+        'twitter_handle',
+        'twitter_followers',
+        'twitter_content',
+        'twitter_date',
+        'likes',
+        'retweets',
+        'replies',
+        'bookmarks',
+        'quotes',
+        'views'
+    ]
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    # Posts schreiben
+    for post in posts:
+        writer.writerow({
+            'factcheck_url': post.factcheck_url or '',
+            'factcheck_title': post.factcheck_title or '',
+            'factcheck_date': post.factcheck_date or '',
+            'factcheck_rating': post.factcheck_rating or '',
+            'twitter_url': post.twitter_url or '',
+            'twitter_author': post.twitter_author or '',
+            'twitter_handle': post.twitter_handle or '',
+            'twitter_followers': post.twitter_followers or 0,
+            'twitter_content': post.twitter_content or '',
+            'twitter_date': post.twitter_date or '',
+            # Nutze manuelle Werte falls vorhanden, sonst automatische
+            'likes': post.likes_manual if post.likes_manual is not None else post.likes,
+            'retweets': post.retweets_manual if post.retweets_manual is not None else post.retweets,
+            'replies': post.replies_manual if post.replies_manual is not None else post.replies,
+            'bookmarks': post.bookmarks_manual if post.bookmarks_manual is not None else post.bookmarks,
+            'quotes': post.quotes_manual if post.quotes_manual is not None else post.quotes,
+            'views': post.views_manual if post.views_manual is not None else post.views
+        })
+
+    # Response erstellen
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=reviewed_posts_{active_session.name}_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+
+    return response
+
+
 @app.route('/api/posts/<int:post_id>', methods=['GET'])
 def get_post(post_id):
     """Einzelnen Post abrufen"""
@@ -634,6 +903,8 @@ def update_post(post_id):
         post.trigger_angst = int(data['trigger_angst'])
     if 'trigger_wut' in data:
         post.trigger_wut = int(data['trigger_wut'])
+    if 'trigger_empoerung' in data:
+        post.trigger_empoerung = int(data['trigger_empoerung'])
     if 'trigger_ekel' in data:
         post.trigger_ekel = int(data['trigger_ekel'])
     if 'trigger_identitaet' in data:
@@ -937,6 +1208,7 @@ def get_advanced_stats():
     ter_values = np.array([p.ter_manual for p in posts])
     trigger_angst = np.array([p.trigger_angst for p in posts])
     trigger_wut = np.array([p.trigger_wut for p in posts])
+    trigger_empoerung = np.array([p.trigger_empoerung for p in posts])
     trigger_ekel = np.array([p.trigger_ekel for p in posts])
     trigger_identitaet = np.array([p.trigger_identitaet for p in posts])
     trigger_hoffnung = np.array([p.trigger_hoffnung for p in posts])
@@ -952,7 +1224,8 @@ def get_advanced_stats():
 
     triggers = {
         'Angst/Bedrohung': trigger_angst,
-        'Wut/Empörung': trigger_wut,
+        'Wut': trigger_wut,
+        'Empörung': trigger_empoerung,
         'Ekel': trigger_ekel,
         'Identitätsbezug': trigger_identitaet,
         'Hoffnung/Stolz': trigger_hoffnung
@@ -978,7 +1251,7 @@ def get_advanced_stats():
     # 2. REGRESSIONSANALYSE
     # Alle Trigger als Features
     X = np.column_stack([
-        trigger_angst, trigger_wut, trigger_ekel,
+        trigger_angst, trigger_wut, trigger_empoerung, trigger_ekel,
         trigger_identitaet, trigger_hoffnung,
         frame_bedrohung, frame_opfer_taeter, frame_verschwoerung,
         frame_moral, frame_historisch
@@ -990,7 +1263,7 @@ def get_advanced_stats():
         model.fit(X, y)
 
         feature_names = [
-            'Angst', 'Wut', 'Ekel', 'Identität', 'Hoffnung',
+            'Angst', 'Wut', 'Empörung', 'Ekel', 'Identität', 'Hoffnung',
             'Bedrohung-Frame', 'Opfer-Täter-Frame', 'Verschwörung-Frame',
             'Moral-Frame', 'Historisch-Frame'
         ]
@@ -1054,6 +1327,7 @@ def get_advanced_stats():
         'trigger_means': {
             'Angst': round(float(np.mean(trigger_angst)), 2),
             'Wut': round(float(np.mean(trigger_wut)), 2),
+            'Empörung': round(float(np.mean(trigger_empoerung)), 2),
             'Ekel': round(float(np.mean(trigger_ekel)), 2),
             'Identität': round(float(np.mean(trigger_identitaet)), 2),
             'Hoffnung': round(float(np.mean(trigger_hoffnung)), 2)
@@ -1069,7 +1343,7 @@ def get_advanced_stats():
 
             # Features: Nur Trigger (0-5 Skala)
             X_clustering = np.column_stack([
-                trigger_angst, trigger_wut, trigger_ekel,
+                trigger_angst, trigger_wut, trigger_empoerung, trigger_ekel,
                 trigger_identitaet, trigger_hoffnung
             ])
 
@@ -1095,6 +1369,7 @@ def get_advanced_stats():
                     'trigger_profile': {
                         'Angst': round(float(np.mean(trigger_angst[cluster_mask])), 2),
                         'Wut': round(float(np.mean(trigger_wut[cluster_mask])), 2),
+                        'Empörung': round(float(np.mean(trigger_empoerung[cluster_mask])), 2),
                         'Ekel': round(float(np.mean(trigger_ekel[cluster_mask])), 2),
                         'Identität': round(float(np.mean(trigger_identitaet[cluster_mask])), 2),
                         'Hoffnung': round(float(np.mean(trigger_hoffnung[cluster_mask])), 2)
@@ -1537,14 +1812,15 @@ def export_reviewed_posts_pdf():
             story.append(Spacer(1, 0.5*cm))
 
             # Trigger & Frames (falls vorhanden)
-            if any([post.trigger_angst, post.trigger_wut, post.trigger_ekel,
+            if any([post.trigger_angst, post.trigger_wut, post.trigger_empoerung, post.trigger_ekel,
                     post.trigger_identitaet, post.trigger_hoffnung]):
                 story.append(Paragraph('Emotionale Trigger (Intensität 0-5)', subheading_style))
 
                 trigger_data = [
                     ['Trigger', 'Intensität'],
                     ['Angst/Bedrohung', str(post.trigger_angst)],
-                    ['Wut/Empörung', str(post.trigger_wut)],
+                    ['Wut', str(post.trigger_wut)],
+                    ['Empörung', str(post.trigger_empoerung)],
                     ['Ekel', str(post.trigger_ekel)],
                     ['Identitätsbezug', str(post.trigger_identitaet)],
                     ['Hoffnung/Stolz', str(post.trigger_hoffnung)],
@@ -1958,7 +2234,7 @@ def export_reviewed_posts_excel():
             current_row += 2
 
             # Trigger (falls vorhanden)
-            if any([post.trigger_angst, post.trigger_wut, post.trigger_ekel,
+            if any([post.trigger_angst, post.trigger_wut, post.trigger_empoerung, post.trigger_ekel,
                     post.trigger_identitaet, post.trigger_hoffnung]):
                 ws_details[f'A{current_row}'] = 'Emotionale Trigger (Intensität 0-5)'
                 ws_details[f'A{current_row}'].font = subheader_font
@@ -1968,7 +2244,8 @@ def export_reviewed_posts_excel():
 
                 trigger_data = [
                     ('Angst/Bedrohung', post.trigger_angst),
-                    ('Wut/Empörung', post.trigger_wut),
+                    ('Wut', post.trigger_wut),
+                    ('Empörung', post.trigger_empoerung),
                     ('Ekel', post.trigger_ekel),
                     ('Identitätsbezug', post.trigger_identitaet),
                     ('Hoffnung/Stolz', post.trigger_hoffnung),
