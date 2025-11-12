@@ -1676,6 +1676,179 @@ def get_advanced_stats():
             'recommendation': 'Bitte überprüfe die Rohdaten in den anderen Statistik-Sektionen.'
         })
 
+    # 8. VISUALISIERUNGS-DATEN FÜR BALKENDIAGRAMME
+    chart_data = {}
+
+    try:
+        # Chart 1: Trigger nach durchschnittlichem TER
+        trigger_ter_chart = []
+        for name, values in triggers.items():
+            # Gruppiere Posts nach Trigger-Intensität (0 vs. 1+ vs. 3+)
+            has_trigger = values > 0
+            strong_trigger = values >= 3
+
+            if np.sum(has_trigger) >= 2:
+                avg_ter_with = np.mean(ter_values[has_trigger])
+                avg_ter_without = np.mean(ter_values[~has_trigger])
+
+                trigger_ter_chart.append({
+                    'trigger': name,
+                    'avg_ter_with': round(float(avg_ter_with), 2),
+                    'avg_ter_without': round(float(avg_ter_without), 2),
+                    'difference': round(float(avg_ter_with - avg_ter_without), 2),
+                    'count_with': int(np.sum(has_trigger)),
+                    'count_without': int(np.sum(~has_trigger))
+                })
+
+        # Sortiere nach Differenz
+        trigger_ter_chart.sort(key=lambda x: x['difference'], reverse=True)
+        chart_data['trigger_ter'] = trigger_ter_chart
+
+        # Chart 2: Frames nach durchschnittlichem TER
+        frame_ter_chart = []
+        for name, values in frames.items():
+            has_frame = values == 1
+            if np.sum(has_frame) >= 2 and np.sum(~has_frame) >= 2:
+                avg_ter_with = np.mean(ter_values[has_frame])
+                avg_ter_without = np.mean(ter_values[~has_frame])
+
+                frame_ter_chart.append({
+                    'frame': name,
+                    'avg_ter_with': round(float(avg_ter_with), 2),
+                    'avg_ter_without': round(float(avg_ter_without), 2),
+                    'difference': round(float(avg_ter_with - avg_ter_without), 2),
+                    'count_with': int(np.sum(has_frame)),
+                    'count_without': int(np.sum(~has_frame))
+                })
+
+        frame_ter_chart.sort(key=lambda x: x['difference'], reverse=True)
+        chart_data['frame_ter'] = frame_ter_chart
+
+        # Chart 3: Trigger-Nutzung mit verschiedenen Frames
+        trigger_frame_combinations = []
+
+        # Für jeden Trigger: durchschnittliche Frame-Nutzung bei verschiedenen Intensitäten
+        for trigger_name, trigger_vals in triggers.items():
+            frame_usage = {}
+
+            # Bei hoher Trigger-Intensität (3+)
+            high_trigger = trigger_vals >= 3
+            if np.sum(high_trigger) >= 2:
+                for frame_name, frame_vals in frames.items():
+                    usage_pct = np.mean(frame_vals[high_trigger]) * 100
+                    frame_usage[frame_name] = round(float(usage_pct), 1)
+
+                trigger_frame_combinations.append({
+                    'trigger': trigger_name,
+                    'intensity': 'Hoch (3+)',
+                    'frame_usage': frame_usage,
+                    'avg_ter': round(float(np.mean(ter_values[high_trigger])), 2),
+                    'count': int(np.sum(high_trigger))
+                })
+
+            # Bei niedriger/keiner Trigger-Intensität (0-1)
+            low_trigger = trigger_vals <= 1
+            if np.sum(low_trigger) >= 2:
+                frame_usage_low = {}
+                for frame_name, frame_vals in frames.items():
+                    usage_pct = np.mean(frame_vals[low_trigger]) * 100
+                    frame_usage_low[frame_name] = round(float(usage_pct), 1)
+
+                trigger_frame_combinations.append({
+                    'trigger': trigger_name,
+                    'intensity': 'Niedrig (0-1)',
+                    'frame_usage': frame_usage_low,
+                    'avg_ter': round(float(np.mean(ter_values[low_trigger])), 2),
+                    'count': int(np.sum(low_trigger))
+                })
+
+        chart_data['trigger_frame_combinations'] = trigger_frame_combinations
+
+        # Chart 4: Top Trigger-Frame Kombinationen nach TER
+        top_combinations = []
+
+        # Für jeden Trigger (hoch) mit jedem Frame
+        for trigger_name, trigger_vals in triggers.items():
+            for frame_name, frame_vals in frames.items():
+                # Posts die BEIDES haben: hoher Trigger UND Frame
+                has_both = (trigger_vals >= 3) & (frame_vals == 1)
+
+                if np.sum(has_both) >= 2:
+                    avg_ter = np.mean(ter_values[has_both])
+                    top_combinations.append({
+                        'combination': f'{trigger_name} + {frame_name}',
+                        'trigger': trigger_name,
+                        'frame': frame_name,
+                        'avg_ter': round(float(avg_ter), 2),
+                        'count': int(np.sum(has_both))
+                    })
+
+        # Sortiere nach TER und nimm Top 10
+        top_combinations.sort(key=lambda x: x['avg_ter'], reverse=True)
+        chart_data['top_combinations'] = top_combinations[:10]
+
+        # Chart 5: Hexagon - Häufigkeit vs. Wirksamkeit für Trigger
+        trigger_hexagon = []
+
+        # Aggressive Skalierung mit festem Faktor für bessere Sichtbarkeit
+        # TER 5% → 20, TER 10% → 40, TER 15% → 60, TER 20% → 80, TER 25% → 100
+        SCALE_FACTOR = 4.0
+
+        for name, values in triggers.items():
+            # Häufigkeit: Prozent der Posts mit diesem Trigger (1+)
+            has_trigger = values > 0
+            frequency_pct = (np.sum(has_trigger) / len(posts)) * 100
+
+            # Wirksamkeit: Durchschnittlicher TER wenn Trigger vorhanden
+            if np.sum(has_trigger) >= 2:
+                avg_ter_with = np.mean(ter_values[has_trigger])
+                avg_ter_without = np.mean(ter_values[~has_trigger])
+
+                # Aggressive Skalierung: TER * 4 (limitiert auf max 100)
+                effectiveness_scaled = min(avg_ter_with * SCALE_FACTOR, 100)
+
+                trigger_hexagon.append({
+                    'trigger': name,
+                    'frequency': round(float(frequency_pct), 1),
+                    'effectiveness': round(float(avg_ter_with), 2),  # Original TER für Tooltip
+                    'effectiveness_scaled': round(float(effectiveness_scaled), 1),  # Skaliert für Chart
+                    'ter_difference': round(float(avg_ter_with - avg_ter_without), 2),
+                    'scale_factor': SCALE_FACTOR
+                })
+
+        chart_data['trigger_hexagon'] = trigger_hexagon
+
+        # Chart 6: Hexagon - Häufigkeit vs. Wirksamkeit für Frames
+        frame_hexagon = []
+
+        for name, values in frames.items():
+            # Häufigkeit: Prozent der Posts mit diesem Frame
+            has_frame = values == 1
+            frequency_pct = (np.sum(has_frame) / len(posts)) * 100
+
+            # Wirksamkeit: Durchschnittlicher TER wenn Frame vorhanden
+            if np.sum(has_frame) >= 2:
+                avg_ter_with = np.mean(ter_values[has_frame])
+                avg_ter_without = np.mean(ter_values[~has_frame])
+
+                # Gleiche aggressive Skalierung
+                effectiveness_scaled = min(avg_ter_with * SCALE_FACTOR, 100)
+
+                frame_hexagon.append({
+                    'frame': name,
+                    'frequency': round(float(frequency_pct), 1),
+                    'effectiveness': round(float(avg_ter_with), 2),  # Original TER
+                    'effectiveness_scaled': round(float(effectiveness_scaled), 1),  # Skaliert
+                    'ter_difference': round(float(avg_ter_with - avg_ter_without), 2),
+                    'scale_factor': SCALE_FACTOR
+                })
+
+        chart_data['frame_hexagon'] = frame_hexagon
+
+    except Exception as e:
+        print(f"Chart data error: {e}")
+        chart_data = {'error': 'Visualisierungsdaten konnten nicht berechnet werden'}
+
     return jsonify({
         'descriptive': descriptive,
         'correlations': correlations,
@@ -1683,7 +1856,8 @@ def get_advanced_stats():
         'group_comparisons': group_comparisons,
         'clusters': clusters,
         'intensity_analysis': intensity_analysis,
-        'interpretations': interpretations
+        'interpretations': interpretations,
+        'chart_data': chart_data
     })
 
 

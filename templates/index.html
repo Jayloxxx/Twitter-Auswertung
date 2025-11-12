@@ -2908,6 +2908,94 @@
                         </div>
                     </div> <!-- End Automatische Interpretationen -->
 
+                    <!-- Visualisierungen: Balkendiagramme -->
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+                            <span class="mr-3">📊</span>
+                            Interaktive Visualisierungen
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-6">
+                            Balkendiagramme zeigen Zusammenhänge zwischen Triggern, Frames und TER auf einen Blick
+                        </p>
+
+                        <!-- Chart 1: Trigger nach TER -->
+                        <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
+                            <h4 class="text-lg font-bold text-gray-900 mb-3">📈 Trigger-Effektivität: Durchschnittlicher TER mit vs. ohne Trigger</h4>
+                            <p class="text-sm text-gray-600 mb-4">Vergleicht den TER von Posts MIT diesem Trigger vs. Posts OHNE diesen Trigger</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <canvas id="triggerTerChart" height="80"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 bg-blue-50 p-3 rounded">
+                                <strong>💡 Interpretation:</strong> Positive Balken = dieser Trigger erhöht den TER. Negative Balken = dieser Trigger senkt den TER.
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Frames nach TER -->
+                        <div class="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6">
+                            <h4 class="text-lg font-bold text-gray-900 mb-3">🎭 Frame-Effektivität: Durchschnittlicher TER mit vs. ohne Frame</h4>
+                            <p class="text-sm text-gray-600 mb-4">Vergleicht den TER von Posts MIT diesem Frame vs. Posts OHNE diesen Frame</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <canvas id="frameTerChart" height="60"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 bg-green-50 p-3 rounded">
+                                <strong>💡 Interpretation:</strong> Positive Balken = dieser Frame erhöht den TER. Negative Balken = dieser Frame senkt den TER.
+                            </div>
+                        </div>
+
+                        <!-- Chart 3: Top Trigger-Frame Kombinationen -->
+                        <div class="mb-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6">
+                            <h4 class="text-lg font-bold text-gray-900 mb-3">🏆 Top 10 Trigger-Frame-Kombinationen</h4>
+                            <p class="text-sm text-gray-600 mb-4">Die erfolgreichsten Kombinationen von starken Triggern (3+) mit Frames, sortiert nach TER</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <canvas id="topCombinationsChart" height="80"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 bg-purple-50 p-3 rounded">
+                                <strong>💡 Interpretation:</strong> Diese Kombinationen zeigen die höchsten TER-Werte. Nutze diese für maximales Engagement!
+                            </div>
+                        </div>
+
+                        <!-- Hexagon Charts: Häufigkeit vs. Wirksamkeit -->
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                            <!-- Hexagon: Trigger -->
+                            <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-6">
+                                <h4 class="text-lg font-bold text-gray-900 mb-3">🎯 Trigger-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                <p class="text-sm text-gray-600 mb-4">Radar-Diagramm zeigt welche Trigger oft verwendet werden UND gut funktionieren</p>
+                                <div class="bg-white rounded-lg p-4">
+                                    <canvas id="triggerHexagonChart" height="350"></canvas>
+                                </div>
+                                <div class="mt-3 text-xs text-gray-500 bg-orange-50 p-3 rounded space-y-1">
+                                    <div><strong>💡 Interpretation:</strong></div>
+                                    <div>• <strong>Große Fläche</strong> = Trigger wird oft verwendet UND ist wirksam</div>
+                                    <div>• <strong>Blaue Linie (Häufigkeit):</strong> Wie oft wird dieser Trigger genutzt? (0-100%)</div>
+                                    <div>• <strong>Rote Linie (Wirksamkeit):</strong> TER × 4 für bessere Sichtbarkeit (TER 20% → 80)</div>
+                                    <div>• <strong>Skalierung:</strong> TER wird mit Faktor 4 multipliziert (max 100). Beispiel: 15% TER → 60 im Chart</div>
+                                    <div>• <strong>Ideal:</strong> Beide Linien weit außen = viel genutzt + sehr wirksam 🏆</div>
+                                    <div>• <strong>Gap-Analyse:</strong> Große Lücke → entweder überschätzt ⚠️ oder unterschätzt 💎</div>
+                                </div>
+                            </div>
+
+                            <!-- Hexagon: Frames -->
+                            <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg p-6">
+                                <h4 class="text-lg font-bold text-gray-900 mb-3">🎭 Frame-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                <p class="text-sm text-gray-600 mb-4">Radar-Diagramm zeigt welche Frames oft verwendet werden UND gut funktionieren</p>
+                                <div class="bg-white rounded-lg p-4">
+                                    <canvas id="frameHexagonChart" height="350"></canvas>
+                                </div>
+                                <div class="mt-3 text-xs text-gray-500 bg-teal-50 p-3 rounded space-y-1">
+                                    <div><strong>💡 Interpretation:</strong></div>
+                                    <div>• <strong>Große Fläche</strong> = Frame wird oft verwendet UND ist wirksam</div>
+                                    <div>• <strong>Grüne Linie (Häufigkeit):</strong> In wie viel % der Posts wird dieser Frame genutzt? (0-100%)</div>
+                                    <div>• <strong>Lila Linie (Wirksamkeit):</strong> TER × 4 für bessere Sichtbarkeit (TER 20% → 80)</div>
+                                    <div>• <strong>Skalierung:</strong> TER wird mit Faktor 4 multipliziert (max 100). Beispiel: 18% TER → 72 im Chart</div>
+                                    <div>• <strong>Gap-Analyse:</strong> Große Lücke = unterschätzt 💎 (selten aber wirksam) oder überschätzt ⚠️ (oft aber unwirksam)</div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div> <!-- End Visualisierungen -->
+
                 </div>
             </div>
 
@@ -3264,6 +3352,13 @@
                     yearly: []
                 },
 
+                // Chart Instances (for destroying/recreating)
+                triggerTerChartInstance: null,
+                frameTerChartInstance: null,
+                topCombinationsChartInstance: null,
+                triggerHexagonChartInstance: null,
+                frameHexagonChartInstance: null,
+
                 // Advanced Statistics
                 advancedStats: null,
                 charts: {
@@ -3490,9 +3585,347 @@
                         const response = await fetch('/api/stats/advanced');
                         const data = await response.json();
                         this.advancedStats = data;
+
+                        // Render charts after data is loaded
+                        await this.$nextTick();
+                        this.renderCharts();
                     } catch (error) {
                         console.error('Error loading advanced stats:', error);
                         this.showNotification('Fehler beim Laden der erweiterten Statistiken', 'error');
+                    }
+                },
+
+                renderCharts() {
+                    if (!this.advancedStats || !this.advancedStats.chart_data) {
+                        return;
+                    }
+
+                    const chartData = this.advancedStats.chart_data;
+
+                    // Chart 1: Trigger nach TER
+                    if (chartData.trigger_ter && chartData.trigger_ter.length > 0) {
+                        const ctx1 = document.getElementById('triggerTerChart');
+                        if (ctx1) {
+                            // Destroy existing chart if it exists
+                            if (this.triggerTerChartInstance) {
+                                this.triggerTerChartInstance.destroy();
+                            }
+
+                            this.triggerTerChartInstance = new Chart(ctx1, {
+                                type: 'bar',
+                                data: {
+                                    labels: chartData.trigger_ter.map(d => d.trigger),
+                                    datasets: [{
+                                        label: 'TER-Differenz (Mit - Ohne Trigger)',
+                                        data: chartData.trigger_ter.map(d => d.difference),
+                                        backgroundColor: chartData.trigger_ter.map(d =>
+                                            d.difference > 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+                                        ),
+                                        borderColor: chartData.trigger_ter.map(d =>
+                                            d.difference > 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'
+                                        ),
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            title: {
+                                                display: true,
+                                                text: 'TER-Differenz (%)'
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: function(context) {
+                                                    const item = chartData.trigger_ter[context.dataIndex];
+                                                    return [
+                                                        `Mit Trigger: ${item.avg_ter_with}% (n=${item.count_with})`,
+                                                        `Ohne Trigger: ${item.avg_ter_without}% (n=${item.count_without})`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Chart 2: Frames nach TER
+                    if (chartData.frame_ter && chartData.frame_ter.length > 0) {
+                        const ctx2 = document.getElementById('frameTerChart');
+                        if (ctx2) {
+                            if (this.frameTerChartInstance) {
+                                this.frameTerChartInstance.destroy();
+                            }
+
+                            this.frameTerChartInstance = new Chart(ctx2, {
+                                type: 'bar',
+                                data: {
+                                    labels: chartData.frame_ter.map(d => d.frame),
+                                    datasets: [{
+                                        label: 'TER-Differenz (Mit - Ohne Frame)',
+                                        data: chartData.frame_ter.map(d => d.difference),
+                                        backgroundColor: chartData.frame_ter.map(d =>
+                                            d.difference > 0 ? 'rgba(34, 197, 94, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+                                        ),
+                                        borderColor: chartData.frame_ter.map(d =>
+                                            d.difference > 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'
+                                        ),
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            title: {
+                                                display: true,
+                                                text: 'TER-Differenz (%)'
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: function(context) {
+                                                    const item = chartData.frame_ter[context.dataIndex];
+                                                    return [
+                                                        `Mit Frame: ${item.avg_ter_with}% (n=${item.count_with})`,
+                                                        `Ohne Frame: ${item.avg_ter_without}% (n=${item.count_without})`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Chart 3: Top Kombinationen
+                    if (chartData.top_combinations && chartData.top_combinations.length > 0) {
+                        const ctx3 = document.getElementById('topCombinationsChart');
+                        if (ctx3) {
+                            if (this.topCombinationsChartInstance) {
+                                this.topCombinationsChartInstance.destroy();
+                            }
+
+                            this.topCombinationsChartInstance = new Chart(ctx3, {
+                                type: 'bar',
+                                data: {
+                                    labels: chartData.top_combinations.map(d => d.combination),
+                                    datasets: [{
+                                        label: 'Durchschnittlicher TER (%)',
+                                        data: chartData.top_combinations.map(d => d.avg_ter),
+                                        backgroundColor: 'rgba(147, 51, 234, 0.7)',
+                                        borderColor: 'rgba(147, 51, 234, 1)',
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            title: {
+                                                display: true,
+                                                text: 'Durchschnittlicher TER (%)'
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: function(context) {
+                                                    const item = chartData.top_combinations[context.dataIndex];
+                                                    return `Anzahl Posts: ${item.count}`;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Chart 4: Trigger Hexagon (Radar)
+                    if (chartData.trigger_hexagon && chartData.trigger_hexagon.length > 0) {
+                        const ctx4 = document.getElementById('triggerHexagonChart');
+                        if (ctx4) {
+                            if (this.triggerHexagonChartInstance) {
+                                this.triggerHexagonChartInstance.destroy();
+                            }
+
+                            const triggerData = chartData.trigger_hexagon;
+
+                            this.triggerHexagonChartInstance = new Chart(ctx4, {
+                                type: 'radar',
+                                data: {
+                                    labels: triggerData.map(d => d.trigger),
+                                    datasets: [
+                                        {
+                                            label: 'Häufigkeit (%)',
+                                            data: triggerData.map(d => d.frequency),
+                                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                            borderColor: 'rgba(59, 130, 246, 1)',
+                                            borderWidth: 2,
+                                            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                            pointBorderColor: '#fff',
+                                            pointHoverBackgroundColor: '#fff',
+                                            pointHoverBorderColor: 'rgba(59, 130, 246, 1)'
+                                        },
+                                        {
+                                            label: 'Wirksamkeit (TER skaliert)',
+                                            data: triggerData.map(d => d.effectiveness_scaled),
+                                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                            borderColor: 'rgba(239, 68, 68, 1)',
+                                            borderWidth: 2,
+                                            pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                                            pointBorderColor: '#fff',
+                                            pointHoverBackgroundColor: '#fff',
+                                            pointHoverBorderColor: 'rgba(239, 68, 68, 1)'
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        r: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                stepSize: 20
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    const item = triggerData[context.dataIndex];
+                                                    if (context.dataset.label.includes('Häufigkeit')) {
+                                                        return `Häufigkeit: ${item.frequency}%`;
+                                                    } else {
+                                                        return `TER: ${item.effectiveness}% (skaliert: ${item.effectiveness_scaled})`;
+                                                    }
+                                                },
+                                                afterLabel: function(context) {
+                                                    const item = triggerData[context.dataIndex];
+                                                    return [
+                                                        `TER-Differenz: ${item.ter_difference}%`,
+                                                        `Skalierungsfaktor: × ${item.scale_factor}`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Chart 5: Frame Hexagon (Radar)
+                    if (chartData.frame_hexagon && chartData.frame_hexagon.length > 0) {
+                        const ctx5 = document.getElementById('frameHexagonChart');
+                        if (ctx5) {
+                            if (this.frameHexagonChartInstance) {
+                                this.frameHexagonChartInstance.destroy();
+                            }
+
+                            const frameData = chartData.frame_hexagon;
+
+                            this.frameHexagonChartInstance = new Chart(ctx5, {
+                                type: 'radar',
+                                data: {
+                                    labels: frameData.map(d => d.frame),
+                                    datasets: [
+                                        {
+                                            label: 'Häufigkeit (%)',
+                                            data: frameData.map(d => d.frequency),
+                                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                            borderColor: 'rgba(16, 185, 129, 1)',
+                                            borderWidth: 2,
+                                            pointBackgroundColor: 'rgba(16, 185, 129, 1)',
+                                            pointBorderColor: '#fff',
+                                            pointHoverBackgroundColor: '#fff',
+                                            pointHoverBorderColor: 'rgba(16, 185, 129, 1)'
+                                        },
+                                        {
+                                            label: 'Wirksamkeit (TER skaliert)',
+                                            data: frameData.map(d => d.effectiveness_scaled),
+                                            backgroundColor: 'rgba(147, 51, 234, 0.2)',
+                                            borderColor: 'rgba(147, 51, 234, 1)',
+                                            borderWidth: 2,
+                                            pointBackgroundColor: 'rgba(147, 51, 234, 1)',
+                                            pointBorderColor: '#fff',
+                                            pointHoverBackgroundColor: '#fff',
+                                            pointHoverBorderColor: 'rgba(147, 51, 234, 1)'
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        r: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                stepSize: 20
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top'
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    const item = frameData[context.dataIndex];
+                                                    if (context.dataset.label.includes('Häufigkeit')) {
+                                                        return `Häufigkeit: ${item.frequency}%`;
+                                                    } else {
+                                                        return `TER: ${item.effectiveness}% (skaliert: ${item.effectiveness_scaled})`;
+                                                    }
+                                                },
+                                                afterLabel: function(context) {
+                                                    const item = frameData[context.dataIndex];
+                                                    return [
+                                                        `TER-Differenz: ${item.ter_difference}%`,
+                                                        `Skalierungsfaktor: × ${item.scale_factor}`
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
                     }
                 },
 
