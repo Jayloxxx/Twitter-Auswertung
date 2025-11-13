@@ -7,7 +7,9 @@
       "Bash(dir:*)",
       "Bash(curl:*)",
       "Bash(python:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(timeout /t 2)",
+      "Bash(del twitter_ter.db)"
     ],
     "deny": [],
     "ask": []
