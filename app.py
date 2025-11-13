@@ -132,6 +132,19 @@ class TwitterPost(db.Model):
     frame_moral = db.Column(db.Integer, default=0)
     frame_historisch = db.Column(db.Integer, default=0)
 
+    # Begründungen für Trigger und Frames
+    trigger_angst_begruendung = db.Column(db.Text)
+    trigger_wut_begruendung = db.Column(db.Text)
+    trigger_empoerung_begruendung = db.Column(db.Text)
+    trigger_ekel_begruendung = db.Column(db.Text)
+    trigger_identitaet_begruendung = db.Column(db.Text)
+    trigger_hoffnung_begruendung = db.Column(db.Text)
+    frame_opfer_taeter_begruendung = db.Column(db.Text)
+    frame_bedrohung_begruendung = db.Column(db.Text)
+    frame_verschwoerung_begruendung = db.Column(db.Text)
+    frame_moral_begruendung = db.Column(db.Text)
+    frame_historisch_begruendung = db.Column(db.Text)
+
     # Metadaten
     is_reviewed = db.Column(db.Boolean, default=False)
     is_archived = db.Column(db.Boolean, default=False)
@@ -187,6 +200,17 @@ class TwitterPost(db.Model):
             'frame_verschwoerung': self.frame_verschwoerung,
             'frame_moral': self.frame_moral,
             'frame_historisch': self.frame_historisch,
+            'trigger_angst_begruendung': self.trigger_angst_begruendung,
+            'trigger_wut_begruendung': self.trigger_wut_begruendung,
+            'trigger_empoerung_begruendung': self.trigger_empoerung_begruendung,
+            'trigger_ekel_begruendung': self.trigger_ekel_begruendung,
+            'trigger_identitaet_begruendung': self.trigger_identitaet_begruendung,
+            'trigger_hoffnung_begruendung': self.trigger_hoffnung_begruendung,
+            'frame_opfer_taeter_begruendung': self.frame_opfer_taeter_begruendung,
+            'frame_bedrohung_begruendung': self.frame_bedrohung_begruendung,
+            'frame_verschwoerung_begruendung': self.frame_verschwoerung_begruendung,
+            'frame_moral_begruendung': self.frame_moral_begruendung,
+            'frame_historisch_begruendung': self.frame_historisch_begruendung,
             'is_reviewed': self.is_reviewed,
             'is_archived': self.is_archived,
             'is_favorite': self.is_favorite,
@@ -2141,6 +2165,89 @@ def export_reviewed_posts_pdf():
         story.append(summary_table)
         story.append(Spacer(1, 1*cm))
 
+        # Referenztabellen für Trigger und Frames
+        story.append(Paragraph('Erklärung: Emotionale Trigger', heading_style))
+        story.append(Paragraph('Die folgenden Trigger beschreiben emotionale Reaktionen, die durch Posts ausgelöst werden können. Intensität wird auf einer Skala von 0-3 gemessen.', normal_style))
+        story.append(Spacer(1, 0.3*cm))
+
+        # Trigger-Referenztabelle
+        trigger_ref_descriptions = {
+            'angst': 'Dieser Trigger aktiviert Schutzreflexe und fördert defensive Einstellungen. Posts, die Angst auslösen, neigen dazu, Menschen vorsichtiger zu machen und können zu Rückzug oder verstärkter Abwehrhaltung führen.',
+            'wut': 'Wut ist eine stark aktivierende Emotion, die Menschen dazu bringt, gegen wahrgenommene Ungerechtigkeiten zu protestieren. Posts mit Wut-Triggern können zu schneller Verbreitung und emotionalen Reaktionen führen.',
+            'empoerung': 'Empörung kombiniert Wut mit moralischer Überlegenheit. Sie ist besonders wirksam für Mobilisierung, da sie Menschen das Gefühl gibt, auf der "richtigen Seite" zu stehen und gegen moralisches Fehlverhalten zu kämpfen.',
+            'ekel': 'Ekel dient der Abgrenzung und kann zur Entmenschlichung führen. Posts, die Ekel auslösen, schaffen starke emotionale Distanz zu den beschriebenen Personen oder Gruppen.',
+            'identitaet': 'Identitätsbezogene Trigger verstärken die "Wir vs. Sie"-Dynamik und fördern Gruppendenken. Sie sind besonders wirksam bei der Mobilisierung von In-Groups gegen Out-Groups.',
+            'hoffnung': 'Hoffnung und Stolz sind positive Mobilisierungstrigger. Sie motivieren Menschen durch das Versprechen einer besseren Zukunft oder durch die Bestätigung der eigenen Gruppenzugehörigkeit.'
+        }
+
+        trigger_ref_data = [
+            ['Trigger', 'Beschreibung'],
+            [Paragraph('Angst/Bedrohung', normal_style), Paragraph(trigger_ref_descriptions['angst'], normal_style)],
+            [Paragraph('Wut', normal_style), Paragraph(trigger_ref_descriptions['wut'], normal_style)],
+            [Paragraph('Empörung', normal_style), Paragraph(trigger_ref_descriptions['empoerung'], normal_style)],
+            [Paragraph('Ekel', normal_style), Paragraph(trigger_ref_descriptions['ekel'], normal_style)],
+            [Paragraph('Identitätsbezug', normal_style), Paragraph(trigger_ref_descriptions['identitaet'], normal_style)],
+            [Paragraph('Hoffnung/Stolz', normal_style), Paragraph(trigger_ref_descriptions['hoffnung'], normal_style)],
+        ]
+
+        trigger_ref_table = Table(trigger_ref_data, colWidths=[4*cm, 12.5*cm])
+        trigger_ref_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+        ]))
+        story.append(trigger_ref_table)
+        story.append(Spacer(1, 0.8*cm))
+
+        # Frame-Referenztabelle
+        story.append(Paragraph('Erklärung: Narrative Frames', heading_style))
+        story.append(Paragraph('Frames sind narrative Strukturen, die bestimmen, wie eine Geschichte erzählt wird. Sie beeinflussen, wie Informationen interpretiert werden.', normal_style))
+        story.append(Spacer(1, 0.3*cm))
+
+        frame_ref_descriptions = {
+            'opfer_taeter': 'Dieser Frame strukturiert die Erzählung in klare Opfer- und Täterrollen. Er ermöglicht einfache Schuldzuweisungen und moralische Bewertungen, die komplexe Situationen vereinfachen.',
+            'bedrohung': 'Der Bedrohungs-Frame stellt eine Situation als existenzielle Gefahr dar. Begriffe wie "Angriff", "bedroht" oder "gefährdet" aktivieren Verteidigungsreflexe und rechtfertigen defensive Maßnahmen.',
+            'verschwoerung': 'Verschwörungs-Frames erklären Ereignisse durch geheime Absprachen mächtiger Akteure. Sie verwenden Begriffe wie "Eliten", "System" oder "Deep State" und bieten alternative Erklärungen für komplexe Phänomene.',
+            'moral': 'Der Moral-Frame teilt die Welt in "Gut" und "Böse" ein. Er verleiht politischen Positionen moralische Autorität und macht Kompromisse schwieriger, da sie als moralisches Versagen interpretiert werden können.',
+            'historisch': 'Historische Frames ziehen Parallelen zu vergangenen Ereignissen, um aktuelle Situationen zu deuten. Sie nutzen kollektive Erinnerungen und können sowohl warnend als auch legitimierend wirken.'
+        }
+
+        frame_ref_data = [
+            ['Frame', 'Beschreibung'],
+            [Paragraph('Opfer-Täter Frame', normal_style), Paragraph(frame_ref_descriptions['opfer_taeter'], normal_style)],
+            [Paragraph('Bedrohungs-Frame', normal_style), Paragraph(frame_ref_descriptions['bedrohung'], normal_style)],
+            [Paragraph('Verschwörungs-Frame', normal_style), Paragraph(frame_ref_descriptions['verschwoerung'], normal_style)],
+            [Paragraph('Moral-Frame', normal_style), Paragraph(frame_ref_descriptions['moral'], normal_style)],
+            [Paragraph('Historischer Frame', normal_style), Paragraph(frame_ref_descriptions['historisch'], normal_style)],
+        ]
+
+        frame_ref_table = Table(frame_ref_data, colWidths=[4*cm, 12.5*cm])
+        frame_ref_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ec4899')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
+        ]))
+        story.append(frame_ref_table)
+        story.append(Spacer(1, 1*cm))
+
         # Für jeden Post eine detaillierte Seite
         for idx, post in enumerate(posts, 1):
             # Seitentrenner (außer beim ersten Post)
@@ -2155,18 +2262,13 @@ def export_reviewed_posts_pdf():
             # Grundinformationen
             story.append(Paragraph('Grundinformationen', subheading_style))
 
-            # Twitter Content (gekürzt wenn zu lang)
-            content = post.twitter_content or 'Kein Inhalt verfügbar'
-            if len(content) > 500:
-                content = content[:500] + '...'
-
             info_data = [
                 ['Autor:', post.twitter_author or 'N/A'],
                 ['Handle:', post.twitter_handle or 'N/A'],
                 ['Follower:', f'{post.twitter_followers:,}'.replace(',', '.') if post.twitter_followers else 'N/A'],
                 ['Veröffentlichungsdatum:', post.twitter_date or 'N/A'],
                 ['Zugriffsdatum:', post.access_date or 'N/A'],
-                ['Twitter URL:', Paragraph(f'<link href="{post.twitter_url}">{post.twitter_url[:80]}...</link>', small_style) if post.twitter_url else 'N/A'],
+                ['Twitter URL:', Paragraph(f'<link href="{post.twitter_url}">{post.twitter_url}</link>', small_style) if post.twitter_url else 'N/A'],
             ]
 
             info_table = Table(info_data, colWidths=[4.5*cm, 12*cm])
@@ -2184,11 +2286,6 @@ def export_reviewed_posts_pdf():
             ]))
             story.append(info_table)
             story.append(Spacer(1, 0.3*cm))
-
-            # Post-Inhalt
-            story.append(Paragraph('Post-Inhalt:', ParagraphStyle('BoldNormal', parent=normal_style, fontName='Helvetica-Bold')))
-            story.append(Paragraph(content, normal_style))
-            story.append(Spacer(1, 0.5*cm))
 
             # Engagement-Metriken
             story.append(Paragraph('Engagement-Metriken (manuell erfasst)', subheading_style))
@@ -2286,26 +2383,42 @@ def export_reviewed_posts_pdf():
                     post.trigger_identitaet, post.trigger_hoffnung]):
                 story.append(Paragraph('Emotionale Trigger (Intensität 0-5)', subheading_style))
 
+                # Post-specific trigger justifications
                 trigger_data = [
-                    ['Trigger', 'Intensität'],
-                    ['Angst/Bedrohung', str(post.trigger_angst)],
-                    ['Wut', str(post.trigger_wut)],
-                    ['Empörung', str(post.trigger_empoerung)],
-                    ['Ekel', str(post.trigger_ekel)],
-                    ['Identitätsbezug', str(post.trigger_identitaet)],
-                    ['Hoffnung/Stolz', str(post.trigger_hoffnung)],
+                    ['Trigger', 'Int.', 'Begründung für diesen Post'],
+                    ['Angst/Bedrohung', str(post.trigger_angst), post.trigger_angst_begruendung if post.trigger_angst > 0 and post.trigger_angst_begruendung else '-'],
+                    ['Wut', str(post.trigger_wut), post.trigger_wut_begruendung if post.trigger_wut > 0 and post.trigger_wut_begruendung else '-'],
+                    ['Empörung', str(post.trigger_empoerung), post.trigger_empoerung_begruendung if post.trigger_empoerung > 0 and post.trigger_empoerung_begruendung else '-'],
+                    ['Ekel', str(post.trigger_ekel), post.trigger_ekel_begruendung if post.trigger_ekel > 0 and post.trigger_ekel_begruendung else '-'],
+                    ['Identitätsbezug', str(post.trigger_identitaet), post.trigger_identitaet_begruendung if post.trigger_identitaet > 0 and post.trigger_identitaet_begruendung else '-'],
+                    ['Hoffnung/Stolz', str(post.trigger_hoffnung), post.trigger_hoffnung_begruendung if post.trigger_hoffnung > 0 and post.trigger_hoffnung_begruendung else '-'],
                 ]
 
-                trigger_table = Table(trigger_data, colWidths=[10*cm, 6.5*cm])
+                # Wrap descriptions in Paragraphs for text wrapping
+                wrapped_trigger_data = []
+                for row in trigger_data:
+                    if trigger_data.index(row) == 0:  # Header row
+                        wrapped_trigger_data.append(row)
+                    else:
+                        wrapped_trigger_data.append([
+                            Paragraph(str(row[0]), normal_style),
+                            Paragraph(str(row[1]), normal_style),
+                            Paragraph(str(row[2]), normal_style)
+                        ])
+
+                trigger_table = Table(wrapped_trigger_data, colWidths=[4*cm, 1.2*cm, 11.3*cm])
                 trigger_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (0, -1), 'LEFT'),
                     ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
                 ]))
@@ -2316,25 +2429,41 @@ def export_reviewed_posts_pdf():
                     post.frame_moral, post.frame_historisch]):
                 story.append(Paragraph('Narrative Frames (binär: 0 = nicht vorhanden, 1 = vorhanden)', subheading_style))
 
+                # Post-specific frame justifications
                 frame_data = [
-                    ['Frame', 'Vorhanden'],
-                    ['Opfer-Täter Frame', '✓' if post.frame_opfer_taeter else '✗'],
-                    ['Bedrohungs-Frame', '✓' if post.frame_bedrohung else '✗'],
-                    ['Verschwörungs-Frame', '✓' if post.frame_verschwoerung else '✗'],
-                    ['Moral-Frame', '✓' if post.frame_moral else '✗'],
-                    ['Historischer Frame', '✓' if post.frame_historisch else '✗'],
+                    ['Frame', '✓/✗', 'Begründung für diesen Post'],
+                    ['Opfer-Täter Frame', '✓' if post.frame_opfer_taeter else '✗', post.frame_opfer_taeter_begruendung if post.frame_opfer_taeter and post.frame_opfer_taeter_begruendung else '-'],
+                    ['Bedrohungs-Frame', '✓' if post.frame_bedrohung else '✗', post.frame_bedrohung_begruendung if post.frame_bedrohung and post.frame_bedrohung_begruendung else '-'],
+                    ['Verschwörungs-Frame', '✓' if post.frame_verschwoerung else '✗', post.frame_verschwoerung_begruendung if post.frame_verschwoerung and post.frame_verschwoerung_begruendung else '-'],
+                    ['Moral-Frame', '✓' if post.frame_moral else '✗', post.frame_moral_begruendung if post.frame_moral and post.frame_moral_begruendung else '-'],
+                    ['Historischer Frame', '✓' if post.frame_historisch else '✗', post.frame_historisch_begruendung if post.frame_historisch and post.frame_historisch_begruendung else '-'],
                 ]
 
-                frame_table = Table(frame_data, colWidths=[10*cm, 6.5*cm])
+                # Wrap descriptions in Paragraphs for text wrapping
+                wrapped_frame_data = []
+                for row in frame_data:
+                    if frame_data.index(row) == 0:  # Header row
+                        wrapped_frame_data.append(row)
+                    else:
+                        wrapped_frame_data.append([
+                            Paragraph(str(row[0]), normal_style),
+                            Paragraph(str(row[1]), normal_style),
+                            Paragraph(str(row[2]), normal_style)
+                        ])
+
+                frame_table = Table(wrapped_frame_data, colWidths=[4*cm, 1.2*cm, 11.3*cm])
                 frame_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ec4899')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (0, -1), 'LEFT'),
                     ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fafb')]),
                 ]))
