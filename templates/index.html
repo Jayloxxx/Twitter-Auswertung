@@ -1723,6 +1723,14 @@
                                                         title="Post öffnen">
                                                     🐦
                                                 </button>
+                                                <!-- Exclusion Toggle Button -->
+                                                <button @click="toggleExcluded(post.id, !post.is_excluded)"
+                                                        :class="post.is_excluded ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                                                        class="p-2 rounded-lg transition-colors"
+                                                        :title="post.is_excluded ? 'Aus Statistiken ausgeschlossen' : 'In Statistiken enthalten'">
+                                                    <span x-show="post.is_excluded">🚫</span>
+                                                    <span x-show="!post.is_excluded">📊</span>
+                                                </button>
                                                 <button @click="viewPostDetails(post)"
                                                         class="bg-primary text-white p-2 rounded-lg hover:bg-blue-600 transition-colors"
                                                         title="Details anzeigen">
@@ -2251,6 +2259,14 @@
                                                    class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
                                                     🐦 Öffnen
                                                 </a>
+                                                <!-- Exclusion Toggle Button -->
+                                                <button @click="toggleExcluded(post.id, !post.is_excluded)"
+                                                        :class="post.is_excluded ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'"
+                                                        class="px-3 py-1 text-xs rounded transition-colors font-medium"
+                                                        :title="post.is_excluded ? 'Aus Statistiken ausgeschlossen' : 'In Statistiken enthalten'">
+                                                    <span x-show="post.is_excluded">🚫 Ausgeschlossen</span>
+                                                    <span x-show="!post.is_excluded">📊 In Statistik</span>
+                                                </button>
                                                 <button @click="showPreview = !showPreview"
                                                         :class="showPreview ? 'bg-green-500' : 'bg-indigo-500'"
                                                         class="px-3 py-1 text-white text-xs rounded hover:opacity-90 transition-colors">
@@ -4449,6 +4465,30 @@
                     } catch (error) {
                         console.error('Error toggling favorite:', error);
                         this.showNotification('Fehler beim Favorisieren', 'error');
+                    }
+                },
+
+                async toggleExcluded(postId, isExcluded) {
+                    try {
+                        const response = await fetch(`/api/posts/${postId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_excluded: isExcluded })
+                        });
+
+                        if (response.ok) {
+                            // Reload posts and statistics
+                            await this.loadPosts(true);
+                            await this.loadStats();
+                            await this.loadStatistics();
+                            this.showNotification(
+                                isExcluded ? 'Post von Statistiken ausgeschlossen' : 'Post wieder in Statistiken aufgenommen',
+                                'success'
+                            );
+                        }
+                    } catch (error) {
+                        console.error('Error toggling exclusion:', error);
+                        this.showNotification('Fehler beim Aendern des Ausschluss-Status', 'error');
                     }
                 },
 

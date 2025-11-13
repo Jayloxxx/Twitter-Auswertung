@@ -63,7 +63,7 @@ class AnalysisSession(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'is_active': self.is_active,
             'post_count': len(self.posts),
-            'reviewed_count': len([p for p in self.posts if p.is_reviewed and not p.is_excluded]),
+            'reviewed_count': len([p for p in self.posts if p.is_reviewed]),
             'archived_count': len([p for p in self.posts if p.is_archived]),
             'favorite_count': len([p for p in self.posts if p.is_favorite])
         }
@@ -969,9 +969,6 @@ def get_statistics():
     # Nur nicht-archivierte Posts für Statistiken
     active_posts = [p for p in all_posts if not p.is_archived]
 
-    # Filter out excluded posts (is_excluded=True)
-    active_posts = [p for p in active_posts if not p.is_excluded]
-
     # NUR REVIEWED POSTS für Statistiken verwenden (von nicht-archivierten)
     posts = [p for p in active_posts if p.is_reviewed]
 
@@ -1053,9 +1050,6 @@ def get_distribution():
     # NUR Posts der aktiven Session
     posts = TwitterPost.query.filter_by(session_id=active_session.id).all()
 
-    # Filter out archived and excluded posts
-    posts = [p for p in posts if not p.is_archived and not p.is_excluded]
-
     # TER-Verteilung (Bins)
     ter_bins = [0, 1, 2, 5, 10, 20, 50, 100, float('inf')]
     ter_distribution = {f'{ter_bins[i]}-{ter_bins[i+1]}': 0 for i in range(len(ter_bins)-1)}
@@ -1085,12 +1079,11 @@ def get_timeline_stats():
     if not active_session:
         return jsonify({'monthly': [], 'yearly': []})
 
-    # NUR REVIEWED POSTS DER AKTIVEN SESSION (OHNE ARCHIVIERTE UND EXCLUDED)
+    # NUR REVIEWED POSTS DER AKTIVEN SESSION (OHNE ARCHIVIERTE)
     all_posts = TwitterPost.query.filter_by(
         session_id=active_session.id,
         is_reviewed=True,
-        is_archived=False,
-        is_excluded=False
+        is_archived=False
     ).all()
 
     if not all_posts:
@@ -1203,12 +1196,11 @@ def get_advanced_stats():
     if not active_session:
         return jsonify({'error': 'Keine aktive Session', 'post_count': 0})
 
-    # NUR REVIEWED POSTS DER AKTIVEN SESSION mit TER-Werten (OHNE ARCHIVIERTE UND EXCLUDED)
+    # NUR REVIEWED POSTS DER AKTIVEN SESSION mit TER-Werten (OHNE ARCHIVIERTE)
     posts = TwitterPost.query.filter_by(
         session_id=active_session.id,
         is_reviewed=True,
-        is_archived=False,
-        is_excluded=False
+        is_archived=False
     ).all()
     posts = [p for p in posts if p.ter_manual is not None and p.ter_manual >= 0]
 
@@ -2046,12 +2038,11 @@ def export_reviewed_posts_pdf():
         if not active_session:
             return jsonify({'error': 'Keine aktive Session'}), 400
 
-        # Hole alle reviewed Posts der aktiven Session (ohne archivierte und excluded)
+        # Hole alle reviewed Posts der aktiven Session (ohne archivierte)
         posts = TwitterPost.query.filter_by(
             session_id=active_session.id,
             is_reviewed=True,
-            is_archived=False,
-            is_excluded=False
+            is_archived=False
         ).order_by(TwitterPost.ter_manual.desc().nullslast()).all()
 
         if not posts:
@@ -2373,12 +2364,11 @@ def export_reviewed_posts_excel():
         if not active_session:
             return jsonify({'error': 'Keine aktive Session'}), 400
 
-        # Hole alle reviewed Posts der aktiven Session (ohne archivierte und excluded)
+        # Hole alle reviewed Posts der aktiven Session (ohne archivierte)
         posts = TwitterPost.query.filter_by(
             session_id=active_session.id,
             is_reviewed=True,
-            is_archived=False,
-            is_excluded=False
+            is_archived=False
         ).order_by(TwitterPost.ter_manual.desc().nullslast()).all()
 
         if not posts:
