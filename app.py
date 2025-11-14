@@ -230,8 +230,8 @@ class TERCalculator:
     WEIGHTS = {
         'like': 1,
         'bookmark': 2,
-        'reply': 3,
-        'retweet': 4,
+        'reply': 4,
+        'retweet': 3,
         'quote': 5
     }
 
@@ -1042,6 +1042,28 @@ def get_statistics():
             'sum': round(sum(data), 2)
         }
 
+    # TER-Verteilung nach Interpretationsschwellenwerten
+    # Verwende manuelle TER-Werte falls vorhanden, sonst automatische
+    ter_interpretation_dist = {
+        'niedrig': 0,      # < 5
+        'mittel': 0,       # 5-10
+        'hoch': 0,         # 10-15
+        'sehr_hoch': 0     # > 15
+    }
+
+    for p in posts:
+        # Verwende manuellen Wert falls vorhanden, sonst automatischen
+        ter_value = p.ter_manual if p.ter_manual is not None else p.ter_automatic
+
+        if ter_value < 5:
+            ter_interpretation_dist['niedrig'] += 1
+        elif ter_value < 10:
+            ter_interpretation_dist['mittel'] += 1
+        elif ter_value < 15:
+            ter_interpretation_dist['hoch'] += 1
+        else:
+            ter_interpretation_dist['sehr_hoch'] += 1
+
     return jsonify({
         'total_posts': len(active_posts),
         'reviewed_posts': len(posts),
@@ -1056,6 +1078,7 @@ def get_statistics():
         'replies': calc_stats(replies),
         'bookmarks': calc_stats(bookmarks),
         'quotes': calc_stats(quotes),
+        'ter_interpretation_distribution': ter_interpretation_dist,
         'top_posts': [
             p.to_dict() for p in sorted(
                 [p for p in posts if p.ter_manual is not None],
