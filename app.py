@@ -1261,7 +1261,7 @@ def get_advanced_stats():
     correlations = {}
 
     triggers = {
-        'Angst/Bedrohung': trigger_angst,
+        'Angst': trigger_angst,
         'Wut': trigger_wut,
         'Empörung': trigger_empoerung,
         'Ekel': trigger_ekel,
@@ -1887,7 +1887,23 @@ def get_advanced_stats():
         print(f"Chart data error: {e}")
         chart_data = {'error': 'Visualisierungsdaten konnten nicht berechnet werden'}
 
-    return jsonify({
+    # Convert NaN to None for JSON compatibility
+    import math
+
+    def clean_nan(obj):
+        """Recursively replace NaN with None for JSON serialization"""
+        if isinstance(obj, dict):
+            return {k: clean_nan(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_nan(item) for item in obj]
+        elif isinstance(obj, float) and math.isnan(obj):
+            return None
+        elif isinstance(obj, float) and math.isinf(obj):
+            return None
+        else:
+            return obj
+
+    result = {
         'descriptive': descriptive,
         'correlations': correlations,
         'regression': regression,
@@ -1896,7 +1912,9 @@ def get_advanced_stats():
         'intensity_analysis': intensity_analysis,
         'interpretations': interpretations,
         'chart_data': chart_data
-    })
+    }
+
+    return jsonify(clean_nan(result))
 
 
 # ==================== SESSION MANAGEMENT ====================
@@ -2182,7 +2200,7 @@ def export_reviewed_posts_pdf():
 
         trigger_ref_data = [
             ['Trigger', 'Beschreibung'],
-            [Paragraph('Angst/Bedrohung', normal_style), Paragraph(trigger_ref_descriptions['angst'], normal_style)],
+            [Paragraph('Angst', normal_style), Paragraph(trigger_ref_descriptions['angst'], normal_style)],
             [Paragraph('Wut', normal_style), Paragraph(trigger_ref_descriptions['wut'], normal_style)],
             [Paragraph('Empörung', normal_style), Paragraph(trigger_ref_descriptions['empoerung'], normal_style)],
             [Paragraph('Ekel', normal_style), Paragraph(trigger_ref_descriptions['ekel'], normal_style)],
@@ -2386,7 +2404,7 @@ def export_reviewed_posts_pdf():
                 # Post-specific trigger justifications
                 trigger_data = [
                     ['Trigger', 'Int.', 'Begründung für diesen Post'],
-                    ['Angst/Bedrohung', str(post.trigger_angst), post.trigger_angst_begruendung if post.trigger_angst > 0 and post.trigger_angst_begruendung else '-'],
+                    ['Angst', str(post.trigger_angst), post.trigger_angst_begruendung if post.trigger_angst > 0 and post.trigger_angst_begruendung else '-'],
                     ['Wut', str(post.trigger_wut), post.trigger_wut_begruendung if post.trigger_wut > 0 and post.trigger_wut_begruendung else '-'],
                     ['Empörung', str(post.trigger_empoerung), post.trigger_empoerung_begruendung if post.trigger_empoerung > 0 and post.trigger_empoerung_begruendung else '-'],
                     ['Ekel', str(post.trigger_ekel), post.trigger_ekel_begruendung if post.trigger_ekel > 0 and post.trigger_ekel_begruendung else '-'],
@@ -2843,7 +2861,7 @@ def export_reviewed_posts_excel():
                 current_row += 1
 
                 trigger_data = [
-                    ('Angst/Bedrohung', post.trigger_angst),
+                    ('Angst', post.trigger_angst),
                     ('Wut', post.trigger_wut),
                     ('Empörung', post.trigger_empoerung),
                     ('Ekel', post.trigger_ekel),
