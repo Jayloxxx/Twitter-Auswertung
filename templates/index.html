@@ -451,7 +451,7 @@
                             class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
                         ✅ Reviewed Posts
                     </button>
-                    <button @click="currentTab = 'statistics'; localStorage.setItem('currentTab', 'statistics'); $nextTick(() => renderTimelineCharts())"
+                    <button @click="currentTab = 'statistics'; localStorage.setItem('currentTab', 'statistics'); $nextTick(async () => { await loadStatistics(); await loadTimelineData(); await $nextTick(); await $nextTick(); renderTimelineCharts(); renderTerInterpretationChart(); })"
                             :class="currentTab === 'statistics' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
                             class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
                         📊 Statistiken
@@ -1355,7 +1355,7 @@
                                     <!-- Replies -->
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                                            💬 Replies <span class="text-xs text-gray-500">(×3)</span>
+                                            💬 Replies <span class="text-xs text-gray-500">(×4)</span>
                                         </label>
                                         <input type="number"
                                                x-model.number="manualCalc.values.replies"
@@ -1367,7 +1367,7 @@
                                     <!-- Retweets -->
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">
-                                            🔄 Retweets <span class="text-xs text-gray-500">(×4)</span>
+                                            🔄 Retweets <span class="text-xs text-gray-500">(×3)</span>
                                         </label>
                                         <input type="number"
                                                x-model.number="manualCalc.values.retweets"
@@ -1396,7 +1396,7 @@
                                             <div class="text-sm text-gray-600 mb-1">Weighted Engagement</div>
                                             <div class="text-2xl font-bold text-purple-600" x-text="manualCalc.result.weighted_engagement.toLocaleString()"></div>
                                             <div class="text-xs text-gray-500 mt-1">
-                                                <span x-text="'(' + manualCalc.values.likes + '×1) + (' + manualCalc.values.bookmarks + '×2) + (' + manualCalc.values.replies + '×3) + (' + manualCalc.values.retweets + '×4) + (' + manualCalc.values.quotes + '×5)'"></span>
+                                                <span x-text="'(' + manualCalc.values.likes + '×1) + (' + manualCalc.values.bookmarks + '×2) + (' + manualCalc.values.replies + '×4) + (' + manualCalc.values.retweets + '×3) + (' + manualCalc.values.quotes + '×5)'"></span>
                                             </div>
                                         </div>
                                         <div>
@@ -1948,7 +1948,7 @@
                         <p class="text-xs text-gray-600">
                             <strong>Formel:</strong> TER√ = Weighted Engagement / √Views
                             <br>
-                            <strong>Gewichtung:</strong> Likes ×1, Bookmarks ×2, Replies ×3, Retweets ×4, Quotes ×5
+                            <strong>Gewichtung:</strong> Likes ×1, Bookmarks ×2, Replies ×4, Retweets ×3, Quotes ×5
                         </p>
                     </div>
                 </div>
@@ -2028,6 +2028,93 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- TER Interpretation Distribution -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                    <h3 class="text-xl font-bold mb-4 text-gray-900">🎯 TER√-Verteilung nach Interpretationsschwellen</h3>
+                    <p class="text-sm text-gray-600 mb-6">
+                        Verteilung der Posts nach psychologischen Aktivierungsstufen (Hirsch 2025)
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Chart -->
+                        <div>
+                            <canvas id="terInterpretationChart" class="w-full" style="max-height: 300px;"></canvas>
+                        </div>
+
+                        <!-- Legend Table -->
+                        <div>
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-gray-700">TER√-Bereich</th>
+                                        <th class="px-4 py-2 text-left text-gray-700">Interpretation</th>
+                                        <th class="px-4 py-2 text-right text-gray-700">Anzahl</th>
+                                        <th class="px-4 py-2 text-right text-gray-700">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-gray-900 font-medium">
+                                            <span class="inline-block w-3 h-3 rounded-full mr-2" style="background-color: #10B981;"></span>
+                                            &lt; 5
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-600">
+                                            <div class="font-medium">Niedrig</div>
+                                            <div class="text-xs text-gray-500">Passive Rezeption, kaum Aktivierung</div>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-medium"
+                                            x-text="statistics.ter_interpretation_distribution?.niedrig || 0"></td>
+                                        <td class="px-4 py-2 text-right text-gray-600"
+                                            x-text="statistics.reviewed_posts > 0 ? ((statistics.ter_interpretation_distribution?.niedrig || 0) / statistics.reviewed_posts * 100).toFixed(1) + '%' : '0%'"></td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-gray-900 font-medium">
+                                            <span class="inline-block w-3 h-3 rounded-full mr-2" style="background-color: #3B82F6;"></span>
+                                            5 – 10
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-600">
+                                            <div class="font-medium">Mittel</div>
+                                            <div class="text-xs text-gray-500">Moderate Aufmerksamkeit, normale Aktivierung</div>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-medium"
+                                            x-text="statistics.ter_interpretation_distribution?.mittel || 0"></td>
+                                        <td class="px-4 py-2 text-right text-gray-600"
+                                            x-text="statistics.reviewed_posts > 0 ? ((statistics.ter_interpretation_distribution?.mittel || 0) / statistics.reviewed_posts * 100).toFixed(1) + '%' : '0%'"></td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-gray-900 font-medium">
+                                            <span class="inline-block w-3 h-3 rounded-full mr-2" style="background-color: #F59E0B;"></span>
+                                            10 – 15
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-600">
+                                            <div class="font-medium">Hoch</div>
+                                            <div class="text-xs text-gray-500">Starke emotionale Beteiligung</div>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-medium"
+                                            x-text="statistics.ter_interpretation_distribution?.hoch || 0"></td>
+                                        <td class="px-4 py-2 text-right text-gray-600"
+                                            x-text="statistics.reviewed_posts > 0 ? ((statistics.ter_interpretation_distribution?.hoch || 0) / statistics.reviewed_posts * 100).toFixed(1) + '%' : '0%'"></td>
+                                    </tr>
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-2 text-gray-900 font-medium">
+                                            <span class="inline-block w-3 h-3 rounded-full mr-2" style="background-color: #EF4444;"></span>
+                                            &gt; 15
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-600">
+                                            <div class="font-medium">Sehr hoch</div>
+                                            <div class="text-xs text-gray-500">Virale Dynamik, maximale Involvierung</div>
+                                        </td>
+                                        <td class="px-4 py-2 text-right font-medium"
+                                            x-text="statistics.ter_interpretation_distribution?.sehr_hoch || 0"></td>
+                                        <td class="px-4 py-2 text-right text-gray-600"
+                                            x-text="statistics.reviewed_posts > 0 ? ((statistics.ter_interpretation_distribution?.sehr_hoch || 0) / statistics.reviewed_posts * 100).toFixed(1) + '%' : '0%'"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -3434,6 +3521,7 @@
                 topCombinationsChartInstance: null,
                 triggerHexagonChartInstance: null,
                 frameHexagonChartInstance: null,
+                terInterpretationChartInstance: null,
 
                 // Advanced Statistics
                 advancedStats: null,
@@ -3640,6 +3728,99 @@
                     } catch (error) {
                         console.error('Error loading statistics:', error);
                     }
+                },
+
+                renderTerInterpretationChart() {
+                    console.log('[DEBUG] renderTerInterpretationChart called');
+
+                    if (!this.statistics || !this.statistics.ter_interpretation_distribution) {
+                        console.log('[DEBUG] No statistics data available');
+                        return;
+                    }
+
+                    // Wait a bit for the DOM to be fully rendered
+                    setTimeout(() => {
+                        const canvas = document.getElementById('terInterpretationChart');
+                        console.log('[DEBUG] Canvas found:', canvas);
+
+                        if (!canvas) {
+                            console.warn('[WARN] TER interpretation chart canvas not found');
+                            return;
+                        }
+
+                        const dist = this.statistics.ter_interpretation_distribution;
+                        console.log('[DEBUG] Distribution data:', dist);
+
+                        // Destroy existing chart if it exists
+                        if (this.terInterpretationChartInstance) {
+                            console.log('[DEBUG] Destroying existing chart');
+                            try {
+                                this.terInterpretationChartInstance.destroy();
+                            } catch (e) {
+                                console.error('[ERROR] Error destroying chart:', e);
+                            }
+                            this.terInterpretationChartInstance = null;
+                        }
+
+                        console.log('[DEBUG] Creating new Chart...');
+                        try {
+                            this.terInterpretationChartInstance = new Chart(canvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: [
+                                'Niedrig (< 5)',
+                                'Mittel (5-10)',
+                                'Hoch (10-15)',
+                                'Sehr hoch (> 15)'
+                            ],
+                            datasets: [{
+                                data: [
+                                    dist.niedrig || 0,
+                                    dist.mittel || 0,
+                                    dist.hoch || 0,
+                                    dist.sehr_hoch || 0
+                                ],
+                                backgroundColor: [
+                                    '#10B981',  // green
+                                    '#3B82F6',  // blue
+                                    '#F59E0B',  // amber
+                                    '#EF4444'   // red
+                                ],
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const value = context.parsed;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
+                                            return context.label + ': ' + value + ' Posts (' + percentage + '%)';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        });
+                        console.log('[DEBUG] Chart created successfully');
+                        } catch (error) {
+                            console.error('[ERROR] Error creating chart:', error);
+                        }
+                    }, 100); // Wait 100ms for DOM to be ready
                 },
 
                 async loadTimelineData() {
@@ -4773,8 +4954,8 @@
                     const weights = {
                         likes: 1,
                         bookmarks: 2,
-                        replies: 3,
-                        retweets: 4,
+                        replies: 4,
+                        retweets: 3,
                         quotes: 5
                     };
 
