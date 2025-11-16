@@ -724,7 +724,7 @@ def get_favorite_posts():
 
 @app.route('/api/posts/favorites/export', methods=['GET'])
 def export_favorites_csv():
-    """Favoriten als CSV exportieren - im gleichen Format wie beim Import"""
+    """Favoriten als CSV exportieren - ohne Follower-Anzahl"""
     from flask import make_response
 
     # Alle favorisierten Posts holen
@@ -736,7 +736,7 @@ def export_favorites_csv():
     # CSV im Speicher erstellen
     output = io.StringIO()
 
-    # CSV-Felder definieren (exakt wie beim Import)
+    # CSV-Felder definieren (ohne twitter_followers, mit access_date)
     fieldnames = [
         'factcheck_url',
         'factcheck_title',
@@ -745,9 +745,9 @@ def export_favorites_csv():
         'twitter_url',
         'twitter_author',
         'twitter_handle',
-        'twitter_followers',
         'twitter_content',
         'twitter_date',
+        'access_date',
         'likes',
         'retweets',
         'replies',
@@ -769,9 +769,9 @@ def export_favorites_csv():
             'twitter_url': post.twitter_url or '',
             'twitter_author': post.twitter_author or '',
             'twitter_handle': post.twitter_handle or '',
-            'twitter_followers': post.twitter_followers or 0,
             'twitter_content': post.twitter_content or '',
             'twitter_date': post.twitter_date or '',
+            'access_date': post.access_date or '',
             # Nutze manuelle Werte falls vorhanden, sonst automatische
             'likes': post.likes_manual if post.likes_manual is not None else post.likes,
             'retweets': post.retweets_manual if post.retweets_manual is not None else post.retweets,
@@ -791,7 +791,7 @@ def export_favorites_csv():
 
 @app.route('/api/posts/reviewed/export-csv', methods=['GET'])
 def export_reviewed_csv():
-    """Reviewed Posts der AKTIVEN SESSION als CSV exportieren - im gleichen Format wie beim Import"""
+    """Reviewed Posts der AKTIVEN SESSION als CSV exportieren - ohne Follower-Anzahl"""
     from flask import make_response
 
     # Aktive Session holen
@@ -812,7 +812,7 @@ def export_reviewed_csv():
     # CSV im Speicher erstellen
     output = io.StringIO()
 
-    # CSV-Felder definieren (exakt wie beim Import)
+    # CSV-Felder definieren (ohne twitter_followers, mit access_date)
     fieldnames = [
         'factcheck_url',
         'factcheck_title',
@@ -821,9 +821,9 @@ def export_reviewed_csv():
         'twitter_url',
         'twitter_author',
         'twitter_handle',
-        'twitter_followers',
         'twitter_content',
         'twitter_date',
+        'access_date',
         'likes',
         'retweets',
         'replies',
@@ -845,9 +845,9 @@ def export_reviewed_csv():
             'twitter_url': post.twitter_url or '',
             'twitter_author': post.twitter_author or '',
             'twitter_handle': post.twitter_handle or '',
-            'twitter_followers': post.twitter_followers or 0,
             'twitter_content': post.twitter_content or '',
             'twitter_date': post.twitter_date or '',
+            'access_date': post.access_date or '',
             # Nutze manuelle Werte falls vorhanden, sonst automatische
             'likes': post.likes_manual if post.likes_manual is not None else post.likes,
             'retweets': post.retweets_manual if post.retweets_manual is not None else post.retweets,
@@ -1741,6 +1741,25 @@ def get_advanced_stats():
     chart_data = {}
 
     try:
+        # Chart 0: Trigger-Häufigkeit (wie oft kommt jeder Trigger vor?)
+        trigger_frequency = []
+        total_posts = len(ter_values)
+        for name, values in triggers.items():
+            has_trigger = values > 0
+            count_with = int(np.sum(has_trigger))
+            percentage = (count_with / total_posts) * 100 if total_posts > 0 else 0
+
+            trigger_frequency.append({
+                'trigger': name,
+                'count': count_with,
+                'total': total_posts,
+                'percentage': round(float(percentage), 1)
+            })
+
+        # Sortiere nach Häufigkeit absteigend
+        trigger_frequency.sort(key=lambda x: x['percentage'], reverse=True)
+        chart_data['trigger_frequency'] = trigger_frequency
+
         # Chart 1: Trigger nach durchschnittlichem TER
         trigger_ter_chart = []
         for name, values in triggers.items():
@@ -1751,6 +1770,7 @@ def get_advanced_stats():
             if np.sum(has_trigger) >= 2:
                 avg_ter_with = np.mean(ter_values[has_trigger])
                 avg_ter_without = np.mean(ter_values[~has_trigger])
+                count_without = int(np.sum(~has_trigger))
 
                 trigger_ter_chart.append({
                     'trigger': name,
@@ -1758,7 +1778,8 @@ def get_advanced_stats():
                     'avg_ter_without': round(float(avg_ter_without), 2),
                     'difference': round(float(avg_ter_with - avg_ter_without), 2),
                     'count_with': int(np.sum(has_trigger)),
-                    'count_without': int(np.sum(~has_trigger))
+                    'count_without': count_without,
+                    'small_control_group': count_without < 10  # Warnung bei kleiner Kontrollgruppe
                 })
 
         # Sortiere nach Differenz
@@ -1772,6 +1793,7 @@ def get_advanced_stats():
             if np.sum(has_frame) >= 2 and np.sum(~has_frame) >= 2:
                 avg_ter_with = np.mean(ter_values[has_frame])
                 avg_ter_without = np.mean(ter_values[~has_frame])
+                count_without = int(np.sum(~has_frame))
 
                 frame_ter_chart.append({
                     'frame': name,
@@ -1779,7 +1801,8 @@ def get_advanced_stats():
                     'avg_ter_without': round(float(avg_ter_without), 2),
                     'difference': round(float(avg_ter_with - avg_ter_without), 2),
                     'count_with': int(np.sum(has_frame)),
-                    'count_without': int(np.sum(~has_frame))
+                    'count_without': count_without,
+                    'small_control_group': count_without < 10  # Warnung bei kleiner Kontrollgruppe
                 })
 
         frame_ter_chart.sort(key=lambda x: x['difference'], reverse=True)
@@ -2306,7 +2329,6 @@ def export_reviewed_posts_pdf():
             info_data = [
                 ['Autor:', post.twitter_author or 'N/A'],
                 ['Handle:', post.twitter_handle or 'N/A'],
-                ['Follower:', f'{post.twitter_followers:,}'.replace(',', '.') if post.twitter_followers else 'N/A'],
                 ['Veröffentlichungsdatum:', post.twitter_date or 'N/A'],
                 ['Zugriffsdatum:', post.access_date or 'N/A'],
                 ['Twitter URL:', Paragraph(f'<link href="{post.twitter_url}">{post.twitter_url}</link>', small_style) if post.twitter_url else 'N/A'],
@@ -2631,9 +2653,9 @@ def export_reviewed_posts_excel():
         # ========== SHEET 2: Alle Posts (Übersicht) ==========
         ws_overview = wb.create_sheet(title="Posts Übersicht")
 
-        # Header
+        # Header (ohne Follower)
         headers = [
-            '#', 'Autor', 'Handle', 'Follower', 'Veröffentlichungsdatum',
+            '#', 'Autor', 'Handle', 'Veröffentlichungsdatum',
             'Zugriffsdatum', 'TER Manuell', 'TER Auto', 'TER Linear',
             'Views', 'Likes', 'Bookmarks', 'Replies', 'Retweets', 'Quotes',
             'Weighted Engagement', 'Total Interactions', 'Engagement Level',
@@ -2664,7 +2686,6 @@ def export_reviewed_posts_excel():
                 idx - 1,
                 post.twitter_author or 'N/A',
                 post.twitter_handle or 'N/A',
-                post.twitter_followers or 0,
                 post.twitter_date or 'N/A',
                 post.access_date or 'N/A',
                 post.ter_manual if post.ter_manual is not None else 'N/A',
