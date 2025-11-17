@@ -1929,6 +1929,48 @@ def get_advanced_stats():
 
         chart_data['frame_hexagon'] = frame_hexagon
 
+        # Chart 7: Häufigste Frame-Kombinationen (Top 5)
+        frame_combination_stats = []
+
+        # Erstelle alle möglichen 2er-Kombinationen von Frames
+        from itertools import combinations
+        frame_names_list = list(frames.keys())
+
+        for frame1_name, frame2_name in combinations(frame_names_list, 2):
+            frame1_vals = frames[frame1_name]
+            frame2_vals = frames[frame2_name]
+
+            # Posts die BEIDE Frames haben
+            has_both = (frame1_vals == 1) & (frame2_vals == 1)
+            count_both = int(np.sum(has_both))
+
+            if count_both >= 2:  # Mindestens 2 Posts mit dieser Kombination
+                avg_ter_both = np.mean(ter_values[has_both])
+
+                # Vergleich: TER mit Kombination vs. ohne
+                without_both = ~has_both
+                if np.sum(without_both) >= 2:
+                    avg_ter_without = np.mean(ter_values[without_both])
+                    ter_difference = avg_ter_both - avg_ter_without
+                else:
+                    avg_ter_without = None
+                    ter_difference = None
+
+                frame_combination_stats.append({
+                    'combination': f'{frame1_name} + {frame2_name}',
+                    'frame1': frame1_name,
+                    'frame2': frame2_name,
+                    'count': count_both,
+                    'avg_ter': round(float(avg_ter_both), 2),
+                    'avg_ter_without': round(float(avg_ter_without), 2) if avg_ter_without is not None else None,
+                    'ter_difference': round(float(ter_difference), 2) if ter_difference is not None else None,
+                    'frequency_pct': round((count_both / len(posts)) * 100, 1)
+                })
+
+        # Sortiere nach Häufigkeit (count) und nimm Top 5
+        frame_combination_stats.sort(key=lambda x: x['count'], reverse=True)
+        chart_data['frame_combinations'] = frame_combination_stats[:5]
+
     except Exception as e:
         print(f"Chart data error: {e}")
         chart_data = {'error': 'Visualisierungsdaten konnten nicht berechnet werden'}
