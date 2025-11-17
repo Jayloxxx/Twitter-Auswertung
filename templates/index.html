@@ -11,6 +11,9 @@
     <!-- Chart.js für Visualisierungen -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+    <!-- Chart.js Datalabels Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
     <!-- Alpine.js für Interaktivität -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
@@ -3081,7 +3084,15 @@
 
                         <!-- Trigger-Häufigkeit -->
                         <div class="mb-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6">
-                            <h4 class="text-lg font-bold text-gray-900 mb-3">📊 Trigger-Häufigkeit: Wie oft kommt jeder Trigger vor?</h4>
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-lg font-bold text-gray-900">📊 Trigger-Häufigkeit: Wie oft kommt jeder Trigger vor?</h4>
+                                <button @click="exportChart('triggerFrequencyChart', 'trigger-haeufigkeit')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Als PNG exportieren
+                                </button>
+                            </div>
                             <p class="text-sm text-gray-600 mb-4">Zeigt in wie vielen der 69 wichtigen Posts (reviewed & not excluded) jeder Trigger vorkommt</p>
                             <div class="bg-white rounded-lg p-4">
                                 <canvas id="triggerFrequencyChart" height="70"></canvas>
@@ -3093,7 +3104,15 @@
 
                         <!-- Chart 1: Trigger nach TER -->
                         <div class="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
-                            <h4 class="text-lg font-bold text-gray-900 mb-3">📈 Trigger-Effektivität: Durchschnittlicher TER mit vs. ohne Trigger</h4>
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-lg font-bold text-gray-900">📈 Trigger-Effektivität: Durchschnittlicher TER mit vs. ohne Trigger</h4>
+                                <button @click="exportChart('triggerTerChart', 'trigger-effektivitaet')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Als PNG exportieren
+                                </button>
+                            </div>
                             <p class="text-sm text-gray-600 mb-4">Vergleicht den TER von Posts MIT diesem Trigger vs. Posts OHNE diesen Trigger</p>
                             <div class="bg-white rounded-lg p-4">
                                 <canvas id="triggerTerChart" height="80"></canvas>
@@ -3110,7 +3129,15 @@
 
                         <!-- Chart 2: Frames nach TER -->
                         <div class="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6">
-                            <h4 class="text-lg font-bold text-gray-900 mb-3">🎭 Frame-Effektivität: Durchschnittlicher TER mit vs. ohne Frame</h4>
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-lg font-bold text-gray-900">🎭 Frame-Effektivität: Durchschnittlicher TER mit vs. ohne Frame</h4>
+                                <button @click="exportChart('frameTerChart', 'frame-effektivitaet')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Als PNG exportieren
+                                </button>
+                            </div>
                             <p class="text-sm text-gray-600 mb-4">Vergleicht den TER von Posts MIT diesem Frame vs. Posts OHNE diesen Frame</p>
                             <div class="bg-white rounded-lg p-4">
                                 <canvas id="frameTerChart" height="60"></canvas>
@@ -3127,7 +3154,15 @@
 
                         <!-- Chart 3: Top Trigger-Frame Kombinationen -->
                         <div class="mb-8 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6">
-                            <h4 class="text-lg font-bold text-gray-900 mb-3">🏆 Top 10 Trigger-Frame-Kombinationen</h4>
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-lg font-bold text-gray-900">🏆 Top 10 Trigger-Frame-Kombinationen</h4>
+                                <button @click="exportChart('topCombinationsChart', 'top-kombinationen')" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Als PNG exportieren
+                                </button>
+                            </div>
                             <p class="text-sm text-gray-600 mb-4">Die erfolgreichsten Kombinationen von starken Triggern (3+) mit Frames, sortiert nach TER</p>
                             <div class="bg-white rounded-lg p-4">
                                 <canvas id="topCombinationsChart" height="80"></canvas>
@@ -3137,12 +3172,40 @@
                             </div>
                         </div>
 
+                        <!-- Chart 4: Häufigste Frame-Kombinationen -->
+                        <div class="mb-8 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-6">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-lg font-bold text-gray-900">🎭 Häufigste Frame-Kombinationen (Top 5)</h4>
+                                <button @click="exportFrameCombinationsChart" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    Als PNG exportieren
+                                </button>
+                            </div>
+                            <p class="text-sm text-gray-600 mb-4">Die am häufigsten gemeinsam verwendeten Frame-Paare in deinen Posts</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <canvas id="frameCombinationsChart" height="60"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 bg-teal-50 p-3 rounded">
+                                <strong>💡 Interpretation:</strong> Diese Frame-Kombinationen kommen besonders häufig zusammen vor. Prüfe, ob diese Kombinationen effektiv sind oder ob du neue Kombinationen testen solltest.
+                            </div>
+                        </div>
+
                         <!-- Hexagon Charts: Häufigkeit vs. Wirksamkeit -->
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                             <!-- Hexagon: Trigger -->
                             <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-6">
-                                <h4 class="text-lg font-bold text-gray-900 mb-3">🎯 Trigger-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                <div class="flex justify-between items-center mb-3">
+                                    <h4 class="text-lg font-bold text-gray-900">🎯 Trigger-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                    <button @click="exportChart('triggerHexagonChart', 'trigger-hexagon')" class="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                        </svg>
+                                        PNG
+                                    </button>
+                                </div>
                                 <p class="text-sm text-gray-600 mb-4">Radar-Diagramm zeigt welche Trigger oft verwendet werden UND gut funktionieren</p>
                                 <div class="bg-white rounded-lg p-4">
                                     <canvas id="triggerHexagonChart" height="350"></canvas>
@@ -3160,7 +3223,15 @@
 
                             <!-- Hexagon: Frames -->
                             <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg p-6">
-                                <h4 class="text-lg font-bold text-gray-900 mb-3">🎭 Frame-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                <div class="flex justify-between items-center mb-3">
+                                    <h4 class="text-lg font-bold text-gray-900">🎭 Frame-Profil: Häufigkeit vs. Wirksamkeit</h4>
+                                    <button @click="exportChart('frameHexagonChart', 'frame-hexagon')" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                        </svg>
+                                        PNG
+                                    </button>
+                                </div>
                                 <p class="text-sm text-gray-600 mb-4">Radar-Diagramm zeigt welche Frames oft verwendet werden UND gut funktionieren</p>
                                 <div class="bg-white rounded-lg p-4">
                                     <canvas id="frameHexagonChart" height="350"></canvas>
@@ -3428,6 +3499,14 @@
 
     <!-- Alpine.js Data -->
     <script>
+        // Datalabels Plugin registrieren
+        Chart.register(ChartDataLabels);
+
+        // Datalabels Plugin global deaktivieren, nur für spezifische Charts aktivieren
+        Chart.defaults.set('plugins.datalabels', {
+            display: false
+        });
+
         function dashboardApp() {
             return {
                 // State
@@ -3542,6 +3621,7 @@
                 triggerTerChartInstance: null,
                 frameTerChartInstance: null,
                 topCombinationsChartInstance: null,
+                frameCombinationsChartInstance: null,
                 triggerHexagonChartInstance: null,
                 frameHexagonChartInstance: null,
                 terInterpretationChartInstance: null,
@@ -3895,6 +3975,63 @@
                     }
                 },
 
+                exportFrameCombinationsChart() {
+                    this.exportChart('frameCombinationsChart', 'frame-kombinationen');
+                },
+
+                exportChart(canvasId, filename) {
+                    const canvas = document.getElementById(canvasId);
+                    if (!canvas) {
+                        this.showNotification('Chart nicht gefunden', 'error');
+                        return;
+                    }
+
+                    try {
+                        // Hochskalierung: Alles wird größer dargestellt
+                        // Standard: 8x größer
+                        // TER-Charts: 10x größer für beste Lesbarkeit
+                        let scale = 8;
+
+                        // Für TER-Effektivitäts-Charts: noch größere Skalierung
+                        if (canvasId === 'triggerTerChart' || canvasId === 'frameTerChart') {
+                            scale = 10; // 10x größer = Schrift, Balken, alles
+                        }
+
+                        // Erstelle temporäres Canvas mit hochskalierten Dimensionen
+                        const tempCanvas = document.createElement('canvas');
+                        const ctx = tempCanvas.getContext('2d');
+
+                        // Setze Größe: Original * Skalierung
+                        tempCanvas.width = canvas.width * scale;
+                        tempCanvas.height = canvas.height * scale;
+
+                        // Weißer Hintergrund
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+                        // Wichtig: imageSmoothingEnabled für scharfe Skalierung
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+
+                        // Zeichne Original-Canvas hochskaliert (alles wird größer)
+                        ctx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+                        // Konvertiere zu PNG mit maximaler Qualität
+                        const url = tempCanvas.toDataURL('image/png', 1.0);
+
+                        // Erstelle Download-Link
+                        const link = document.createElement('a');
+                        link.download = `${filename}.png`;
+                        link.href = url;
+                        link.click();
+
+                        this.showNotification(`Chart exportiert (${tempCanvas.width}×${tempCanvas.height}px, ${scale}x größer)`, 'success');
+                    } catch (error) {
+                        console.error('Export error:', error);
+                        this.showNotification('Fehler beim Export: ' + error.message, 'error');
+                    }
+                },
+
                 renderCharts() {
                     console.log('[DEBUG] renderCharts() called');
 
@@ -4073,7 +4210,21 @@
                                         borderColor: chartData.frame_ter.map(d =>
                                             d.difference > 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'
                                         ),
-                                        borderWidth: 2
+                                        borderWidth: 2,
+                                        datalabels: {
+                                            anchor: 'end',
+                                            align: function(context) {
+                                                return context.dataset.data[context.dataIndex] < 0 ? 'start' : 'end';
+                                            },
+                                            formatter: function(value) {
+                                                return value.toFixed(1) + '%';
+                                            },
+                                            color: '#374151',
+                                            font: {
+                                                weight: 'bold',
+                                                size: 11
+                                            }
+                                        }
                                     }]
                                 },
                                 options: {
@@ -4102,6 +4253,9 @@
                                                     ];
                                                 }
                                             }
+                                        },
+                                        datalabels: {
+                                            display: true
                                         }
                                     }
                                 }
@@ -4156,6 +4310,107 @@
                                         }
                                     }
                                 }
+                            });
+                        }
+                    }
+
+                    // Chart 3.5: Frame-Kombinationen
+                    if (chartData.frame_combinations && chartData.frame_combinations.length > 0) {
+                        const ctxFrameCombo = document.getElementById('frameCombinationsChart');
+                        if (ctxFrameCombo) {
+                            if (this.frameCombinationsChartInstance) {
+                                this.frameCombinationsChartInstance.destroy();
+                            }
+
+                            // Custom Plugin für Datalabels
+                            const frameCombinationPlugin = {
+                                id: 'frameCombinationLabels',
+                                afterDatasetsDraw(chart) {
+                                    const ctx = chart.ctx;
+                                    chart.data.datasets.forEach((dataset, i) => {
+                                        const meta = chart.getDatasetMeta(i);
+                                        meta.data.forEach((bar, index) => {
+                                            const value = dataset.data[index];
+                                            ctx.save();
+                                            ctx.font = '14px Arial';
+                                            ctx.fillStyle = '#000000';
+                                            ctx.textAlign = 'left';
+                                            ctx.textBaseline = 'middle';
+                                            const x = bar.x + 5;
+                                            const y = bar.y;
+                                            ctx.fillText(value, x, y);
+                                            ctx.restore();
+                                        });
+                                    });
+                                }
+                            };
+
+                            this.frameCombinationsChartInstance = new Chart(ctxFrameCombo, {
+                                type: 'bar',
+                                data: {
+                                    labels: chartData.frame_combinations.map(d => d.combination),
+                                    datasets: [{
+                                        label: 'Anzahl Posts',
+                                        data: chartData.frame_combinations.map(d => d.count),
+                                        backgroundColor: 'rgba(20, 184, 166, 0.7)',
+                                        borderColor: 'rgba(20, 184, 166, 1)',
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    indexAxis: 'y',
+                                    responsive: true,
+                                    maintainAspectRatio: true,
+                                    scales: {
+                                        x: {
+                                            beginAtZero: true,
+                                            title: {
+                                                display: true,
+                                                text: 'Anzahl Posts',
+                                                color: '#000000',
+                                                font: {
+                                                    size: 14
+                                                }
+                                            },
+                                            ticks: {
+                                                color: '#000000',
+                                                font: {
+                                                    size: 12
+                                                }
+                                            }
+                                        },
+                                        y: {
+                                            ticks: {
+                                                color: '#000000',
+                                                font: {
+                                                    size: 12
+                                                }
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                afterLabel: function(context) {
+                                                    const item = chartData.frame_combinations[context.dataIndex];
+                                                    const lines = [
+                                                        `Häufigkeit: ${item.frequency_pct}%`,
+                                                        `Durchschnittlicher TER: ${item.avg_ter}%`
+                                                    ];
+                                                    if (item.avg_ter_without !== null) {
+                                                        lines.push(`TER ohne Kombination: ${item.avg_ter_without}%`);
+                                                        lines.push(`Differenz: ${item.ter_difference}%`);
+                                                    }
+                                                    return lines;
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                plugins: [frameCombinationPlugin]
                             });
                         }
                     }
