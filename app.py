@@ -2408,8 +2408,8 @@ def export_reviewed_posts_pdf():
                 ['Views (Impressionen)', f'{views:,}'.replace(',', '.'), '-'],
                 ['Likes', f'{likes:,}'.replace(',', '.'), '× 1'],
                 ['Bookmarks', f'{bookmarks:,}'.replace(',', '.'), '× 2'],
-                ['Replies', f'{replies:,}'.replace(',', '.'), '× 3'],
-                ['Retweets', f'{retweets:,}'.replace(',', '.'), '× 4'],
+                ['Retweets', f'{retweets:,}'.replace(',', '.'), '× 3'],
+                ['Replies', f'{replies:,}'.replace(',', '.'), '× 4'],
                 ['Quote Tweets', f'{quotes:,}'.replace(',', '.'), '× 5'],
             ]
 
@@ -2435,8 +2435,8 @@ def export_reviewed_posts_pdf():
             weighted_engagement = (
                 (likes * 1) +
                 (bookmarks * 2) +
-                (replies * 3) +
-                (retweets * 4) +
+                (retweets * 3) +
+                (replies * 4) +
                 (quotes * 5)
             )
 
@@ -2860,8 +2860,8 @@ def export_reviewed_posts_excel():
                 ('Views (Impressionen)', views, '-'),
                 ('Likes', likes, '× 1'),
                 ('Bookmarks', bookmarks, '× 2'),
-                ('Replies', replies, '× 3'),
-                ('Retweets', retweets, '× 4'),
+                ('Retweets', retweets, '× 3'),
+                ('Replies', replies, '× 4'),
                 ('Quote Tweets', quotes, '× 5'),
             ]
 
@@ -2886,8 +2886,8 @@ def export_reviewed_posts_excel():
             current_row += 1
 
             weighted_engagement = (
-                (likes * 1) + (bookmarks * 2) + (replies * 3) +
-                (retweets * 4) + (quotes * 5)
+                (likes * 1) + (bookmarks * 2) + (retweets * 3) +
+                (replies * 4) + (quotes * 5)
             )
             ter_sqrt = weighted_engagement / math.sqrt(views) if views > 0 else 0
             ter_manual = post.ter_manual if post.ter_manual is not None else ter_sqrt

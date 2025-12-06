@@ -17,7 +17,7 @@ Professionelles Dashboard zur Analyse von Twitter Engagement Rate (TER) nach Hir
 ```
 TER = (weighted_engagement / views) * 100
 
-weighted_engagement = (likes × 1) + (bookmarks × 2) + (replies × 3) + (retweets × 4) + (quotes × 5)
+weighted_engagement = (likes × 1) + (bookmarks × 2) + (replies × 4) + (retweets × 3) + (quotes × 5)
 ```
 
 ## Installation
