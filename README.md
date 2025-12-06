@@ -12,13 +12,17 @@ Professionelles Dashboard zur Analyse von Twitter Engagement Rate (TER) nach Hir
 - **Professionelles UI**: Modern gestaltet mit Tailwind CSS
 - **SQLite Datenbank**: Alle Daten werden persistent gespeichert
 
-## TER-Berechnung (Hirsch 2025)
+## TER-Berechnung (Twitter Engagement Rate)
 
-```
-TER = (weighted_engagement / views) * 100
+$$TER = \frac{\sum_{i=1}^{n} (w_i \times E_i)}{\sqrt{Views}}$$
 
-weighted_engagement = (likes × 1) + (bookmarks × 2) + (replies × 4) + (retweets × 3) + (quotes × 5)
-```
+**Gewichtung nach Hirsch 2025:**
+
+- Likes (E₁): w₁ = 1
+- Bookmarks (E₂): w₂ = 2
+- Retweets (E₃): w₃ = 3
+- Replies (E₄): w₄ = 4
+- Quotes (E₅): w₅ = 5
 
 ## Installation
 

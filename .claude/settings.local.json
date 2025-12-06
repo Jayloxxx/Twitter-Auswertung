@@ -13,7 +13,10 @@
       "Bash(git config:*)",
       "Bash(git filter-branch:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
