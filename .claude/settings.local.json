@@ -9,7 +9,11 @@
       "Bash(python:*)",
       "Bash(cat:*)",
       "Bash(timeout /t 2)",
-      "Bash(del twitter_ter.db)"
+      "Bash(del twitter_ter.db)",
+      "Bash(git config:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
